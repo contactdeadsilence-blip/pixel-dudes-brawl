@@ -91,6 +91,32 @@ app.get('/api/leaderboard',(req,res)=>{const t=(req.get('authorization')||'').re
 function rateMatch(order){const P=order.filter(x=>x.uid&&!x.guest);const n=P.length;const out={};if(n<2)return out;const K=32/(n-1);
  const R=P.map(x=>q.byId.get(x.uid).rating);P.forEach((a,i)=>{let d=0;P.forEach((b,j)=>{if(i==j)return;const e=1/(1+Math.pow(10,(R[j]-R[i])/400)),sc=a.place<b.place?1:a.place>b.place?0:.5;d+=K*(sc-e)});
   const nr=Math.max(0,Math.round(R[i]+d));rq.upd.run(nr,a.won?1:0,a.uid);out[a.uid]={old:R[i],rating:nr,delta:nr-R[i],tier:PDB.tierOf(nr)}});return out}
+// ===== Friends + invites =====
+db.exec('CREATE TABLE IF NOT EXISTS friends(a INTEGER,b INTEGER,status INTEGER DEFAULT 0,created INTEGER,PRIMARY KEY(a,b))');
+const fq={get:db.prepare('SELECT * FROM friends WHERE (a=? AND b=?) OR (a=? AND b=?)'),ins:db.prepare('INSERT OR IGNORE INTO friends(a,b,status,created) VALUES(?,?,0,?)'),
+ acc:db.prepare('UPDATE friends SET status=1 WHERE a=? AND b=?'),del:db.prepare('DELETE FROM friends WHERE (a=? AND b=?) OR (a=? AND b=?)'),
+ n:db.prepare('SELECT COUNT(*) n FROM friends WHERE a=? OR b=?'),
+ list:db.prepare('SELECT f.a,f.b,f.status,ua.username an,ub.username bn FROM friends f JOIN users ua ON ua.id=f.a JOIN users ub ON ub.id=f.b WHERE f.a=? OR f.b=?')};
+const SEEN=new Map(),WSU=new Map(),INV=new Map();const seen=u=>{if(u)SEEN.set(u.id,Date.now())};
+const isOn=id=>(WSU.get(id)||0)>0||Date.now()-(SEEN.get(id)||0)<25000;
+const areFriends=(x,y)=>{const r=fq.get.get(x,y,y,x);return !!(r&&r.status==1)};
+function privRoomOf(uid){for(const r of rooms.values())if(!r.quick&&r.state=='lobby'&&r.slots.some(s=>s&&s.type=='human'&&s.uid==uid)&&r.slots.some(s=>!s))return r.code;return null}
+const noGuest=(req,res,next)=>{if(req.user.guest)return res.status(403).json({error:'GUESTS CANNOT ADD FRIENDS'});seen(req.user);next()};
+const target=(req,res)=>{const n=String((req.body||{}).name||'').trim();const t=n&&q.byName.get(n);if(!t||t.guest){res.status(404).json({error:'NO SUCH PLAYER'});return null}if(t.id==req.user.id){res.status(400).json({error:"THAT'S YOU!"});return null}return t};
+app.get('/api/friends',auth,(req,res)=>{const me=req.user.id;seen(req.user);if(req.user.guest)return res.json({guest:true,friends:[],incoming:[],outgoing:[],invites:[]});
+ const out={friends:[],incoming:[],outgoing:[]};for(const r of fq.list.all(me,me)){const other=r.a==me?r.b:r.a,name=r.a==me?r.bn:r.an;
+  if(r.status==1)out.friends.push({name,online:isOn(other),room:privRoomOf(other)});else if(r.b==me)out.incoming.push(name);else out.outgoing.push(name)}
+ out.friends.sort((x,y)=>(y.online-x.online)||x.name.localeCompare(y.name));
+ const now=Date.now();out.invites=(INV.get(me)||[]).filter(i=>now-i.at<300000&&rooms.has(i.code)&&rooms.get(i.code).state=='lobby').map(i=>({from:i.from,code:i.code,at:i.at}));res.json(out)});
+app.post('/api/friends/add',auth,noGuest,(req,res)=>{const t=target(req,res);if(!t)return;const me=req.user.id,r=fq.get.get(me,t.id,t.id,me);
+ if(r&&r.status==1)return res.json({ok:true,msg:'ALREADY FRIENDS'});if(r&&r.a==t.id){fq.acc.run(t.id,me);return res.json({ok:true,msg:'NOW FRIENDS WITH '+t.username})}
+ if(r)return res.json({ok:true,msg:'REQUEST ALREADY SENT'});if(fq.n.get(me,me).n>=100)return res.status(400).json({error:'FRIEND LIST FULL'});
+ fq.ins.run(me,t.id,Date.now());res.json({ok:true,msg:'REQUEST SENT TO '+t.username})});
+app.post('/api/friends/accept',auth,noGuest,(req,res)=>{const t=target(req,res);if(!t)return;const r=fq.get.get(t.id,req.user.id,-1,-1);if(!r)return res.status(404).json({error:'NO REQUEST'});fq.acc.run(t.id,req.user.id);res.json({ok:true,msg:'NOW FRIENDS WITH '+t.username})});
+app.post('/api/friends/remove',auth,noGuest,(req,res)=>{const t=target(req,res);if(!t)return;fq.del.run(req.user.id,t.id,t.id,req.user.id);res.json({ok:true,msg:'REMOVED '+t.username})});
+app.post('/api/friends/invite',auth,noGuest,(req,res)=>{const t=target(req,res);if(!t)return;const me=req.user.id;if(!areFriends(me,t.id))return res.status(403).json({error:'NOT FRIENDS'});
+ const code=String((req.body||{}).code||'').toUpperCase(),r=rooms.get(code);if(!r||r.quick||r.state!='lobby'||!r.slots.some(s=>s&&s.uid==me))return res.status(400).json({error:'JOIN A PRIVATE ROOM FIRST'});
+ const L=(INV.get(t.id)||[]).filter(i=>!(i.from==req.user.username&&i.code==code)&&Date.now()-i.at<300000);L.push({from:req.user.username,code,at:Date.now()});INV.set(t.id,L.slice(-10));res.json({ok:true,msg:'INVITED '+t.username})});
 app.get('/healthz',(req,res)=>res.json({ok:true,rooms:rooms.size}));
 app.use(express.static(path.join(__dirname,'..','public')));
 
@@ -142,7 +168,7 @@ setInterval(()=>{const now=Date.now();for(const r of rooms.values()){if(r.state!
 
 const server=http.createServer(app);const wss=new WebSocketServer({server,path:'/ws',maxPayload:4096});
 wss.on('connection',(ws,req)=>{const tok=new URL(req.url,'http://x').searchParams.get('token');const u=userOf(tok);
- if(!u){send(ws,{t:'err',m:'LOG IN FIRST',fatal:true});return ws.close()}ws.user=u;ws.room=null;
+ if(!u){send(ws,{t:'err',m:'LOG IN FIRST',fatal:true});return ws.close()}ws.user=u;ws.room=null;WSU.set(u.id,(WSU.get(u.id)||0)+1);ws.on('close',()=>{WSU.set(u.id,Math.max(0,(WSU.get(u.id)||1)-1))});
  ws.on('message',d=>{let m;try{m=JSON.parse(d)}catch(e){return}if(!m||typeof m.t!='string')return;const r=ws.room;
   switch(m.t){
    case 'quick':{if(r)leave(ws);let room=[...rooms.values()].find(x=>x.quick&&x.state=='lobby'&&humans(x).length<4&&x.slots.some(s=>!s));if(!room)room=newRoom(true);join(room,ws);break}

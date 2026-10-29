@@ -86,3 +86,58 @@ function drawSpecials(){for(const f of F){if(f.out||f.respawn>0||!(f.spT>0))cont
 const _drawBuffsS=drawBuffs;drawBuffs=function(){_drawBuffsS();drawSpecials()};
 const _hudPtsS=hudPts;hudPts=function(f,x,y){const r=_hudPtsS(f,x,y);if(!f.out){const ok=!(f.spCd>0);ctx.fillStyle=PAL.o;ctx.fillRect(x+101,y+21,9,9);ctx.fillStyle=ok?'#fee761':'#5d4a6e';ctx.fillRect(x+102,y+22,7,7);if(!ok){ctx.fillStyle='#8b93a6';const h=Math.round(7*(1-Math.min(1,f.spCd/80)));ctx.fillRect(x+102,y+29-h,7,h)}else{ctx.fillStyle='#ffffff';ctx.fillRect(x+103,y+23,2,2)}}return r};
 const TEAMN=['RED','BLUE'];
+// ===== Friends, invites, invite links =====
+UIS.add('friends');ONL_ITEMS.splice(ONL_ITEMS.indexOf('SHOP'),0,'FRIENDS');
+const FR={data:null,err:null,sel:0,name:'',msg:'',back:'online',confirm:-1,seenInv:new Set(),seenReq:new Set(),pendInv:null,busy:false};
+function frRefresh(){if(!ONLINE||!ACC.user||ACC.user.guest)return Promise.resolve();return api('friends').then(j=>{FR.data=j;FR.err=null;
+ for(const i of j.invites){const k=i.from+i.code+i.at;if(!FR.seenInv.has(k)){FR.seenInv.add(k);if(state!='ofight'&&state!='fight'){toast(i.from+' INVITED YOU! SEE FRIENDS');SFX.coin()}}}
+ for(const n of j.incoming)if(!FR.seenReq.has(n)){FR.seenReq.add(n);toast('FRIEND REQUEST FROM '+n)}}).catch(e=>{FR.err='COULD NOT LOAD'})}
+if(ONLINE)setInterval(()=>{if(ACC.user&&!ACC.user.guest&&state!='fight'&&state!='ofight'&&!document.hidden)frRefresh()},6000);
+function frRows(){const D=FR.data||{friends:[],incoming:[],outgoing:[],invites:[]};const R=[{k:'add'}];
+ D.invites.forEach(i=>R.push({k:'inv',n:i.from,code:i.code}));D.incoming.forEach(n=>R.push({k:'req',n}));D.friends.forEach(f=>R.push(Object.assign({k:'fr'},f,{n:f.name})));D.outgoing.forEach(n=>R.push({k:'out',n}));return R}
+function goFriends(back){if(!ACC.user){openLogin('online');toast('LOG IN TO USE FRIENDS');return}if(ACC.user.guest){toast('GUESTS CANNOT ADD FRIENDS - REGISTER!');SFX.err();return}
+ FR.back=back||'online';FR.sel=0;FR.msg='';FR.confirm=-1;state='friends';frRefresh()}
+function frDo(path,name,after){if(FR.busy)return;FR.busy=true;api('friends/'+path,{name}).then(j=>{FR.busy=false;FR.msg=j.msg||'OK';SFX.ok();if(after)after();return frRefresh()}).catch(e=>{FR.busy=false;FR.msg=e.message;SFX.err()})}
+function inviteLink(code){return location.origin+location.pathname+'?join='+code}
+function frInvite(n){{FR.pendInv=n;FR.back='lobby';NET.lobby=null;state='lobby';netOpen({t:'create'});toast('CREATING ROOM FOR '+n+'...')}}
+const _typeKeyF=typeKey;typeKey=function(ch){if(state=='friends'&&FR.sel==0){if(ch=='\b')FR.name=FR.name.slice(0,-1);else if(FR.name.length<12&&/[A-Za-z0-9_]/.test(ch))FR.name+=ch.toUpperCase();return true}return _typeKeyF(ch)};
+function updFriends(){const R=frRows();if(FR.sel>=R.length)FR.sel=R.length-1;const os=FR.sel;FR.sel=listNav(R.length,FR.sel);if(os!=FR.sel)FR.confirm=-1;
+ if(KP.Escape||anyPad(i=>padEdge(i,'B'))){SFX.back();state=FR.back=='lobby'&&NET.lobby?'lobby':'online';return}
+ const r=R[FR.sel],ok=KP.Enter||anyPad(i=>padEdge(i,'A')),del=KP.Delete||anyPad(i=>padEdge(i,'X'))||(r.k!='add'&&KP.Backspace);
+ if(r.k=='add'){if(ok){if(!FR.name){FR.msg='TYPE A USERNAME FIRST';SFX.err()}else frDo('add',FR.name,()=>FR.name='')}return}
+ if(r.k=='req'){if(ok)frDo('accept',r.n);else if(del)frDo('remove',r.n)}
+ else if(r.k=='inv'){if(ok){SFX.ok();NET.lobby=null;state='lobby';netOpen({t:'join',code:r.code})}}
+ else if(r.k=='out'){if(del)frDo('remove',r.n)}
+ else if(r.k=='fr'){const L=NET.lobby,inPriv=L&&!L.quick;
+  if(ok){if(!inPriv&&r.room){SFX.ok();NET.lobby=null;state='lobby';netOpen({t:'join',code:r.room})}else if(inPriv){frDo('invite',r.n)}else{SFX.ok();frInvite(r.n)}}
+  if(del){if(FR.confirm==FR.sel){FR.confirm=-1;frDo('remove',r.n)}else{FR.confirm=FR.sel;FR.msg='PRESS AGAIN TO REMOVE '+r.n;SFX.sel()}}}}
+function drawFriends(){text('FRIENDS',W/2,28,PAL.Y,32,'center');acctBadge(W-4,4,'right');panel(60,36,360,182);const R=frRows(),L=NET.lobby,inPriv=L&&!L.quick;
+ const top=Math.max(0,Math.min(FR.sel-4,R.length-9));
+ R.slice(top,top+9).forEach((r,kk)=>{const k=kk+top,y=44+kk*19,on=k==FR.sel;if(on){ctx.fillStyle='#5d4a6e';ctx.fillRect(66,y,348,18);ctx.fillStyle=PAL.Y;ctx.fillRect(66,y,2,18)}
+  const c=on?PAL.Y:'#ffffff';
+  if(r.k=='add'){text('ADD FRIEND:',74,y+13,'#d8dde6',8);panel(144,y+2,150,14,'#3b3f52');text(FR.name+(on&&Math.floor(t/20)%2?'_':''),148,y+13,'#ffffff',8);text(on?'TYPE NAME + ENTER':'',406,y+13,'#8b93a6',8,'right')}
+  else if(r.k=='inv'){text('INVITE: '+r.n+' - ROOM '+r.code,74,y+13,'#fee761',16);text('JOIN',406,y+13,c,8,'right')}
+  else if(r.k=='req'){text('REQUEST: '+r.n,74,y+13,'#8fb8ff',16);text('ACCEPT / DECLINE',406,y+13,c,8,'right')}
+  else if(r.k=='out'){text(r.n+' (PENDING)',74,y+13,'#8b93a6',16);text(on?'CANCEL':'',406,y+13,c,8,'right')}
+  else{ctx.fillStyle=PAL.o;ctx.fillRect(73,y+5,8,8);ctx.fillStyle=r.online?'#7fe07f':'#5d5d70';ctx.fillRect(74,y+6,6,6);text(r.n,86,y+13,c,16);
+   const st=r.room&&!inPriv?'IN ROOM '+r.room+' - JOIN':r.online?(inPriv?'INVITE TO '+L.code:'ONLINE - INVITE'):'OFFLINE';text(FR.confirm==k?'REMOVE?':st,406,y+13,FR.confirm==k?'#ff7f7f':r.online?'#a1e55a':'#8b93a6',8,'right')}});
+ if(!FR.data)text(FR.err||'LOADING...',W/2,130,'#d8dde6',16,'center');else if(R.length==1)text('NO FRIENDS YET - ADD ONE BY USERNAME',W/2,120,'#d8dde6',8,'center');
+ text(FR.msg,W/2,214,'#fee761',8,'center');
+ const r=R[FR.sel]||{};bar([[['DP'],'SELECT'],[['A'],r.k=='req'?'ACCEPT':r.k=='add'?'ADD':'OK'],...(r.k=='fr'||r.k=='req'||r.k=='out'?[[['X'],'REMOVE']]:[]),[['B'],'BACK']],
+  [[['\u2191','\u2193'],'SELECT'],[['ENTER'],r.k=='req'?'ACCEPT':r.k=='add'?'ADD':'OK'],...(r.k=='fr'||r.k=='req'||r.k=='out'?[[['DEL'],'REMOVE']]:[]),[['ESC'],'BACK']],236)}
+const _updOnlF=updOnlineMenu;updOnlineMenu=function(){if(ONL_ITEMS[onlSel]=='FRIENDS'&&mOK()){SFX.ok();goFriends('online');return}_updOnlF()};
+const _drawUIf=drawUI;drawUI=function(){if(state=='friends')drawFriends();else _drawUIf()};
+// invite link (?join=CODE): auto-join once logged in
+let PJ=null;if(ONLINE)try{const c=new URLSearchParams(location.search).get('join');if(c&&/^[A-Za-z]{4}$/.test(c)){PJ=c.toUpperCase();history.replaceState(null,'',location.pathname)}}catch(e){}
+let PJasked=false;
+const _updUIf=updUI;updUI=function(){
+ if(PJ&&!ACC.checking&&(state=='menu'||state=='online')){if(ACC.user){const c=PJ;PJ=null;NET.lobby=null;state='lobby';netOpen({t:'join',code:c});toast('JOINING ROOM '+c)}else if(!PJasked){PJasked=true;openLogin('online');toast('LOG IN (OR PLAY AS GUEST) TO JOIN ROOM '+PJ)}}
+ if(state=='friends')updFriends();else _updUIf()};
+// lobby: invite link + friends
+const _updLobbyF=updLobby;updLobby=function(){const L=NET.lobby;
+ if(L&&!L.quick){if(KP.KeyL){const u=inviteLink(L.code);SFX.ok();try{navigator.clipboard.writeText(u).then(()=>toast('INVITE LINK COPIED!'),()=>toast(u))}catch(e){toast(u)}return}
+  if(KP.KeyV||anyPad(i=>padEdge(i,'ST'))&&!L.host){goFriends('lobby');return}
+  if(FR.pendInv&&L.code){const n=FR.pendInv;FR.pendInv=null;api('friends/invite',{name:n,code:L.code}).then(j=>toast(j.msg)).catch(e=>toast(e.message))}}
+ _updLobbyF()};
+const _drawLobbyF=drawLobby;drawLobby=function(){_drawLobbyF();const L=NET.lobby;if(!L||L.quick)return;
+ text(lastDev=='pad'?(L.host?'SHARE CODE '+L.code+' OR INVITE FROM ONLINE > FRIENDS':'START: INVITE FRIENDS'):(ACC.user&&!ACC.user.guest?'L: COPY INVITE LINK   V: INVITE FRIENDS':'L: COPY INVITE LINK'),W/2,229,'#8fb8ff',8,'center')};
