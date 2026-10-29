@@ -11,7 +11,7 @@ function myUnlocks(){return ACC.user?ACC.user.unlocked:STARTER}
 const LOCKS=ONLINE;function owned(n){return !LOCKS||myUnlocks().includes(n)}
 let setSyncTimer=null;function onSetChange(){if(!ONLINE||!ACC.user)return;clearTimeout(setSyncTimer);setSyncTimer=setTimeout(()=>{const s=Object.assign({},SET);api('settings',{settings:s}).catch(()=>{})},600)}
 // auto-login with the token saved on this device; a rejected token (expired / server reset) is cleared so the login screen shows
-if(ONLINE&&ACC.token){ACC.checking=true;api('me').then(j=>{j.fresh=true;setUser(j);ACC.checking=false;toast('WELCOME BACK '+ACC.user.username+'!')}).catch(e=>{ACC.checking=false;if(e.status==401){clearTok();toast('PLEASE LOG IN AGAIN')}})}
+if(ONLINE&&ACC.token){ACC.checking=true;api('me').then(j=>{j.fresh=true;setUser(j);ACC.checking=false;toast('WELCOME BACK '+ACC.user.username+'!');claimDaily()}).catch(e=>{ACC.checking=false;if(e.status==401){clearTok();toast('PLEASE LOG IN AGAIN')}})}
 // ===== Small UI helpers =====
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function listNav(n,sel){if(mU()){SFX.sel();return (sel+n-1)%n}if(mD()){SFX.sel();return (sel+1)%n}return sel}
@@ -84,7 +84,7 @@ const LG_ITEMS=['USERNAME','PASSWORD','REMEMBER ME','LOG IN','REGISTER','PLAY AS
 function typeKey(ch){if(state=='login'&&LG.sel<2&&!LG.busy){const k=LG.sel?'pass':'user';if(ch=='\b')LG[k]=LG[k].slice(0,-1);else if(LG[k].length<(LG.sel?32:12)&&(LG.sel||/[A-Za-z0-9_]/.test(ch)))LG[k]+=LG.sel?ch:ch.toUpperCase();return true}
  if(state=='joincode'){if(ch=='\b'){JC.pos=Math.max(0,JC.pos-1);JC.code[JC.pos]='A'}else if(/[A-Za-z]/.test(ch)){JC.code[JC.pos]=ch.toUpperCase();JC.pos=Math.min(3,JC.pos+1)}SFX.sel();return true}return false}
 function authDo(kind){if(LG.busy)return;if(kind!='guest'&&(!LG.user||!LG.pass)){LG.msg='ENTER USERNAME AND PASSWORD';SFX.err();return}LG.busy=true;LG.msg='...';
- api(kind,kind=='guest'?{}:{username:LG.user,password:LG.pass}).then(j=>{j.fresh=true;setUser(j);if(kind!='guest'&&REMEMBER&&window.PasswordCredential&&navigator.credentials)try{navigator.credentials.store(new PasswordCredential({id:LG.user,password:LG.pass,name:LG.user})).catch(()=>{})}catch(e){}LG.busy=false;LG.pass='';SFX.ok();toast('HI '+ACC.user.username+'!');if(LG.after=='shop')goShop('menu');else{state='online';onlSel=0}})
+ api(kind,kind=='guest'?{}:{username:LG.user,password:LG.pass}).then(j=>{j.fresh=true;setUser(j);if(kind!='guest'&&REMEMBER&&window.PasswordCredential&&navigator.credentials)try{navigator.credentials.store(new PasswordCredential({id:LG.user,password:LG.pass,name:LG.user})).catch(()=>{})}catch(e){}LG.busy=false;LG.pass='';SFX.ok();toast('HI '+ACC.user.username+'!');claimDaily();if(LG.after=='shop')goShop('menu');else{state='online';onlSel=0}})
   .catch(e=>{LG.busy=false;LG.msg=e.message;SFX.err()})}
 function updOSK(){const C='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_',n=C.length+2;if(mL())OSK.i=(OSK.i+n-1)%n;if(mR())OSK.i=(OSK.i+1)%n;if(mU())OSK.i=(OSK.i-10+n*10)%n;if(mD())OSK.i=(OSK.i+10)%n;
  if(anyPad(i=>padEdge(i,'A'))||KP.Enter){if(OSK.i<C.length){typeKey(LG.sel?C[OSK.i].toLowerCase():C[OSK.i]);SFX.sel()}else if(OSK.i==C.length){typeKey('\b');SFX.back()}else{OSK=null;SFX.ok()}}
@@ -153,6 +153,7 @@ function drawResults(){const R=NET.res;if(!R)return;ctx.fillStyle='rgba(59,44,46
  const w=R.winner!=null?R.rank.find(r=>r.i==R.winner):null;text(w?w.name+' WINS!':'DRAW!',W/2,50,w?PCOL[w.i]:'#ffffff',32,'center');
  R.rank.forEach((r,k)=>{const y=70+k*30;panel(76,y,328,26,r.i==NET.you?'#5d4a6e':'#3b3f52');text(String(k+1),88,y+19,PAL.Y,16,'center');drawSheet(imgs[r.skin],98,y+1,1,0,0);text(r.name,120,y+18,PCOL[r.i],16);
   text(r.kos+' KO',300,y+18,'#ffffff',16,'right');if(r.coins){coinIcon(318,y+9);text('+'+r.coins,330,y+17,'#fee761',16)}});
+ const me=R.rank.find(r=>r.i==NET.you);if(me&&me.bd)text(bdText(me.bd),W/2,186,'#d8dde6',8,'center');
  if(ACC.user){coinIcon(W/2-40,196);text('TOTAL '+ACC.user.coins,W/2-30,203,'#fee761',8)}
  bar([[['A'],'CONTINUE'],[['B'],'LEAVE']],[[['ENTER'],'CONTINUE'],[['ESC'],'LEAVE']],212)}
 // ===== Lobby =====
@@ -183,7 +184,7 @@ function drawShop(){text('SKIN SHOP',W/2,24,PAL.Y,32,'center');acctBadge(W-4,4,'
  for(let n=0;n<NS;n++){const x=gx+(n%GC)*30,y=gy+Math.floor(n/GC)*33;panel(x,y,28,31,n==SH.sel?'#5d4a6e':'#2b2b40');ctx.drawImage(imgs[n],0,0,FW,FH,x+6,y+4,FW,FH);if(!owned(n))lockIcon(x,y,PRICES[n]);
   if(n==SH.sel){ctx.fillStyle=PAL.Y;ctx.fillRect(x-1,y-1,30,2);ctx.fillRect(x-1,y+30,30,2);ctx.fillRect(x-1,y-1,2,33);ctx.fillRect(x+27,y-1,2,33)}}
  const n=SH.sel;panel(60,136,360,74);drawSheet(imgs[n],76,140,1,2,Math.floor(t/7)%4,3);text(NAMES[n],140,160,PAL.Y,24);
- if(owned(n))text('UNLOCKED',140,184,'#a1e55a',16);else{coinIcon(140,175);text(String(PRICES[n]),152,184,'#fee761',16);text(ACC.user&&ACC.user.coins>=PRICES[n]?'PRESS A / ENTER TO BUY':'EARN COINS IN ONLINE MATCHES',140,200,'#d8dde6',8)}
+ if(owned(n))text('UNLOCKED',140,184,'#a1e55a',16);else{coinIcon(140,175);text(String(PRICES[n]),152,184,'#fee761',16);text(ACC.user&&ACC.user.coins>=PRICES[n]?'PRESS A / ENTER TO BUY':'EARN COINS: PLAY ONLINE OR VS CPU WHILE LOGGED IN',140,200,'#d8dde6',8)}
  bar([[['DP'],'BROWSE'],[['A'],'BUY'],[['Y'],'BUY COINS'],[['B'],'BACK']],[[['\u2190','\u2192'],'BROWSE'],[['ENTER'],'BUY'],[['C'],'BUY COINS'],[['ESC'],'BACK']],242)}
 // ===== UI dispatch =====
 const UIS=new Set(['menu','settings','login','online','joincode','lobby','shop']);
@@ -202,3 +203,19 @@ function doBackClick(){backClick=false;if(!backBtnShown())return;
 const _updRaw=update;update=function(){if(backClick)doBackClick();_updRaw()};
 const _drawRaw=draw;draw=function(){_drawRaw();if(!backBtnShown())return;ctx.save();ctx.setTransform(cv.width/W,0,0,cv.height/H,0,0);const b=BACKBTN,l=backLabel();
  panel(b.x,b.y,b.w,b.h);text(l,b.x+b.w/2,b.y+13,'#ffffff',8,'center');ctx.restore()}
+
+// ===== Coin earning (server decides amounts) =====
+function claimDaily(){if(!ACC.user||ACC.user.guest)return;api('daily',{}).then(j=>{ACC.user=j.user;if(j.bonus){toast('DAILY BONUS +'+j.bonus+' COINS');setTimeout(()=>SFX.coin(),300)}}).catch(()=>{})}
+function bdText(b){const p=[];if(b.part)p.push('PLAY +'+b.part);if(b.ko)p.push('KO +'+b.ko);if(b.place)p.push('PLACE +'+b.place);if(b.win)p.push('WIN +'+b.win);if(b.firstWin)p.push('1ST WIN TODAY +'+b.firstWin);return p.join('  ')}
+const LC={ticket:null,res:null,busy:false,me:-1};
+const _sfRaw=startFight;startFight=function(){_sfRaw();LKOS.fill(0);LC.res=null;LC.ticket=null;LC.me=slots.findIndex(s=>s.type=='human');
+ if(ONLINE&&ACC.user&&LC.me>=0)api('local/start',{}).then(j=>LC.ticket=j.ticket).catch(()=>{})};
+function localClaim(){const tk=LC.ticket;LC.ticket=null;if(!tk||!ACC.user)return;LC.busy=true;
+ api('local/end',{ticket:tk,players:slots.filter(s=>s.type!='none').length,kos:LKOS[LC.me]||0,won:!!(winner&&winner.i==LC.me)}).then(j=>{LC.busy=false;LC.res=j;ACC.user=j.user;if(j.coins)setTimeout(()=>SFX.coin(),400)}).catch(()=>{LC.busy=false})}
+let _prevState=null;const _updC=update;update=function(){_updC();if(state=='win'&&_prevState!='win')localClaim();_prevState=state};
+const _drawC=draw;draw=function(){_drawC();if(!ONLINE)return;ctx.save();ctx.setTransform(cv.width/W,0,0,cv.height/H,0,0);
+ if(state=='menu'&&ACC.user)safe(()=>acctBadge(W-4,4,'right'));
+ if(state=='win')safe(()=>{if(!ACC.user)text('LOG IN TO EARN COINS',W/2,184,'#f99252',8,'center');else if(LC.busy)text('COUNTING COINS...',W/2,184,'#d8dde6',8,'center');
+  else if(LC.res){const r=LC.res;coinIcon(W/2-60,176);text('+'+r.coins+' COINS   TOTAL '+ACC.user.coins,W/2-50,183,'#fee761',8);text(r.coins?bdText(r.breakdown)+(r.capped?'  (DAILY CAP)':''):(r.why||'DAILY LOCAL CAP REACHED').toUpperCase(),W/2,192,'#d8dde6',8,'center')}});
+ if(state=='select'&&!ACC.user)safe(()=>text('LOG IN VIA ONLINE TO EARN COINS + UNLOCK SKINS',W/2,133,'#f99252',8,'center'));
+ ctx.restore()}

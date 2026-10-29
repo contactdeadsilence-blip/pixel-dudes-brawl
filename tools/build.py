@@ -83,6 +83,9 @@ rest=rest[:i0]+"""   if(state=='oresult')drawResults();
 rest=rest.replace("if(padEdge(pi,'B')&&!slots.some(s=>s.type=='human')){state='menu'","if(padEdge(pi,'B')){state='menu'")
 rest=rest.replace("[[PB('ST')],n>=2?'FIGHT!':'NEED 2+']],W/2,254)","[[PB('ST')],n>=2?'FIGHT!':'NEED 2+'],[[PB('B')],'MENU']],W/2,254)")
 rest=rest.replace("[[KC('BKSP')],'DEL CPU']],W/2,241)","[[KC('BKSP')],'DEL CPU'],[[KC('ESC')],'MENU']],W/2,241)")
+rest=rest.replace("' IS LOCKED - SEE SHOP'","(ACC.user?' IS LOCKED - SEE SHOP':' IS LOCKED - LOG IN TO UNLOCK')")
+rest=rest.replace("text('LOCKED',x+72,y+62,'#f99252',8,'center');","text(ACC.user?'LOCKED - SHOP':'LOG IN TO UNLOCK',x+72,y+62,'#f99252',8,'center');")
+
 rest+="\nfunction hudName(f){if(state=='ofight'||state=='oresult'){const n=(NET.names[f.i]||'P'+(f.i+1)).slice(0,10);return f.i==NET.you?n:n}return f.cpu?'CPU':'P'+(f.i+1)}"
 tail=rng(238,246).replace('arenaPrev=ARENAS.map(a=>{','arenaPrev=ARENAS.map((a,ai)=>{').replace('ctx.drawImage(bgCanvas(),0,0,c.width,c.height)','ctx.drawImage(bgCanvas(ai),0,0,c.width,c.height)').replace("if(showFPS)","if(SET.fps)").replace("window.__game={","window.__game={get NET(){return NET},get ACC(){return ACC},SET,CORE,saveSet,setState:s=>state=s,get W(){return W},get H(){return H},")
 tail=tail.replace("Promise.all(imgs.map","applySet();\nPromise.all(imgs.map")

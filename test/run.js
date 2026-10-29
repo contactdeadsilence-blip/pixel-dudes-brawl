@@ -1,5 +1,6 @@
 // Headless integration test: accounts, shop validation, 2 ws clients fighting a quick match, rewards, private room + CPU.
 'use strict';
+const PDBP=require('../shared/core.js').PRICES;
 const path=require('path'),fs=require('fs'),os=require('os'),assert=require('assert');
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'pdb-'));
 Object.assign(process.env,{DB_PATH:path.join(tmp,'t.db'),MATCH_TIME_S:'12',QUICK_FILL_MS:'3000',COUNTDOWN_MS:'1000'});
@@ -43,8 +44,8 @@ const wait=(f,ms,what)=>new Promise((res,rej)=>{const t0=Date.now(),h=setInterva
  r=await api('me',null,A);assert.equal(r.j.user.coins,meR.coins,'coins persisted');console.log('KOs in match',kos,'alice earned',meR.coins);
  // --- buy a skin after topping up coins (simulates a few matches)
  db.prepare("UPDATE users SET coins=coins+200 WHERE username='alice'").run();const before=(await api('me',null,A)).j.user.coins;
- r=await api('shop/buy',{skin:4},A);assert.equal(r.status,200);assert(r.j.user.unlocked.includes(4));assert.equal(r.j.user.coins,before-150);
- r=await api('shop/buy',{skin:4},A);assert.equal(r.status,409);console.log('skin purchase OK, coins',before,'->',before-150);
+ r=await api('shop/buy',{skin:4},A);assert.equal(r.status,200);assert(r.j.user.unlocked.includes(4));assert.equal(r.j.user.coins,before-PDBP[4]);
+ r=await api('shop/buy',{skin:4},A);assert.equal(r.status,409);console.log('skin purchase OK, coins',before,'->',before-PDBP[4]);
  // --- private room with code + CPU, then disconnect mid-match -> CPU takeover
  c1.end=c2.end=null;c1.start=c2.start=null;c1.send({t:'leave'});c2.send({t:'leave'});c1.send({t:'create'});await wait(()=>c1.lobby&&!c1.lobby.quick,2000,'private room');
  const code=c1.lobby.code;assert(/^[A-Z]{4}$/.test(code));c2.send({t:'join',code});await wait(()=>c2.lobby&&c2.lobby.code==code,2000,'join');

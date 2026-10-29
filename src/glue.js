@@ -1,5 +1,5 @@
 // ===== Arenas & physics live in the shared core (shared/core.js), same code the server runs =====
-const CORE=PDBCore.createCore({sfx:(k,a)=>{SFX[k]&&SFX[k](a)},shake:v=>addShake(v),burst:(x,y,c,n,sp)=>burst(x,y,c,n,sp),part:(x,y)=>partFx(x,y),ko:f=>koFx(f.x,f.y,f.i)});
+const CORE=PDBCore.createCore({sfx:(k,a)=>{SFX[k]&&SFX[k](a)},shake:v=>addShake(v),burst:(x,y,c,n,sp)=>burst(x,y,c,n,sp),part:(x,y)=>partFx(x,y),ko:f=>koFx(f.x,f.y,f.i),kill:(k,v)=>{if(LKOS[k]!=null)LKOS[k]++}});const LKOS=[0,0,0,0];
 const ARENAS=CORE.ARENAS,PRICES=PDBCore.PRICES,STARTER=PDBCore.STARTER;let WW=960,WH=544,map=ARENAS[0].map,arena=0;
 const solidCh=c=>c=='#'||c=='=';const hitbox=f=>CORE.hitbox(f);
 function partFx(x,y){if(parts.length<PMAX)parts.push({x,y,vx:(Math.random()-.5)*1.6,vy:-Math.random()*1.2,l:12,c:'#ffffff'})}

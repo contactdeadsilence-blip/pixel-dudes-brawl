@@ -4,7 +4,7 @@ const path=require('path'),fs=require('fs'),http=require('http'),crypto=require(
 const express=require('express'),{WebSocketServer}=require('ws'),Database=require('better-sqlite3'),bcrypt=require('bcryptjs');
 const PDB=require('../shared/core.js');
 const PORT=+process.env.PORT||3000,DB_PATH=process.env.DB_PATH||path.join(__dirname,'..','data','brawl.db');
-const NS=PDB.PRICES.length,REWARD={part:20,ko:15,win:50},ONLINE_RULES={stocks:3,time:(+process.env.MATCH_TIME_S||240)*60,diff:1};
+const NS=PDB.PRICES.length,REWARD={part:25,ko:10,place:[50,25,10,0],firstWin:100,daily:50},LOCAL={part:10,ko:5,win:25,maxKo:9,maxMatch:60,minSec:process.env.LOCAL_MIN_SEC!=null?+process.env.LOCAL_MIN_SEC:30,dayCap:400,tickets:new Map()},ONLINE_RULES={stocks:3,time:(+process.env.MATCH_TIME_S||240)*60,diff:1};
 const QUICK_FILL_MS=+process.env.QUICK_FILL_MS||15000,COUNTDOWN_MS=+process.env.COUNTDOWN_MS||5000;
 fs.mkdirSync(path.dirname(DB_PATH),{recursive:true});
 const db=new Database(DB_PATH);db.pragma('journal_mode = WAL');
@@ -35,6 +35,26 @@ app.post('/api/login',(req,res)=>{const {username,password}=req.body||{};const u
  if(!u||u.guest||typeof password!='string'||!bcrypt.compareSync(password,u.pass))return res.status(401).json({error:'wrong username or password'});res.json({token:newSession(u),user:pub(u)})});
 app.post('/api/guest',(req,res)=>{let name;for(let k=0;k<20;k++){name='GUEST'+(1000+Math.floor(Math.random()*9000));if(!q.byName.get(name))break}
  const id=q.ins.run(name,null,JSON.stringify(PDB.STARTER),1,Date.now()).lastInsertRowid;const u=q.byId.get(id);res.json({token:newSession(u),user:pub(u)})});
+// ===== Earning =====
+db.exec('CREATE TABLE IF NOT EXISTS earn(user_id INTEGER,day TEXT,kind TEXT,amt INTEGER)');
+const dayKey=()=>new Date(Date.now()-8*36e5).toISOString().slice(0,10); // Pacific-ish day
+const eq={has:db.prepare('SELECT 1 FROM earn WHERE user_id=? AND day=? AND kind=?'),sum:db.prepare('SELECT COALESCE(SUM(amt),0) s FROM earn WHERE user_id=? AND day=? AND kind=?'),add:db.prepare('INSERT INTO earn VALUES(?,?,?,?)')};
+function grant(uid,kind,amt){if(amt>0){q.coins.run(amt,uid);eq.add.run(uid,dayKey(),kind,amt)}return amt}
+function onceToday(uid,kind,amt){return eq.has.get(uid,dayKey(),kind)?0:grant(uid,kind,amt)}
+function dailyLogin(u){if(u.guest)return 0;return onceToday(u.id,'login',REWARD.daily)}
+app.post('/api/daily',auth,(req,res)=>{const n=dailyLogin(req.user);res.json({bonus:n,user:pub(q.byId.get(req.user.id))})});
+// local / vs-CPU play: server issues a ticket at match start and validates the claim (time, KO caps, daily cap)
+app.post('/api/local/start',auth,(req,res)=>{const id=crypto.randomBytes(12).toString('hex');LOCAL.tickets.set(id,{uid:req.user.id,at:Date.now()});
+ for(const [k,v] of LOCAL.tickets)if(Date.now()-v.at>36e5)LOCAL.tickets.delete(k);res.json({ticket:id})});
+app.post('/api/local/end',auth,(req,res)=>{const b=req.body||{},tk=LOCAL.tickets.get(String(b.ticket));
+ if(!tk||tk.uid!=req.user.id)return res.status(400).json({error:'bad ticket'});LOCAL.tickets.delete(String(b.ticket));
+ const secs=(Date.now()-tk.at)/1000,players=Math.max(0,Math.min(4,b.players|0));
+ if(secs<LOCAL.minSec||players<2)return res.json({coins:0,why:'match too short',user:pub(q.byId.get(req.user.id))});
+ const kos=Math.max(0,Math.min(LOCAL.maxKo,3*(players-1),b.kos|0,Math.floor(secs/5))),won=!!b.won;
+ const bd={part:LOCAL.part,ko:LOCAL.ko*kos,win:won?LOCAL.win:0};let tot=Math.min(LOCAL.maxMatch,bd.part+bd.ko+bd.win);
+ const left=Math.max(0,LOCAL.dayCap-eq.sum.get(req.user.id,dayKey(),'local').s);let capped=tot>left;tot=Math.min(tot,left);grant(req.user.id,'local',tot);
+ bd.firstWin=won&&tot>0?onceToday(req.user.id,'firstwin',REWARD.firstWin):0;
+ res.json({coins:tot+bd.firstWin,breakdown:bd,capped,user:pub(q.byId.get(req.user.id))})});
 app.post('/api/logout',auth,(req,res)=>{q.delTok.run(req.token);res.json({ok:true})});
 app.get('/api/me',auth,(req,res)=>res.json({user:pub(req.user)}));
 app.post('/api/settings',auth,(req,res)=>{const s=req.body&&req.body.settings;if(!s||typeof s!='object'||Array.isArray(s))return res.status(400).json({error:'bad settings'});
@@ -85,7 +105,7 @@ function tickRoom(r){const c=r.core;let res;try{res=c.step(i=>{const s=r.slots[i
  if(c.tick%2==0||res){const m=JSON.stringify({t:'snap',tick:c.tick,F:c.snap(),readyT:c.readyT,endT:c.endT,timer:c.timer,ev:r.ev.splice(0)});for(const s of humans(r))if(s.ws.readyState==1)s.ws.send(m)}
  if(res=='win')endMatch(r)}
 function endMatch(r){clearInterval(r.loop);r.loop=null;const c=r.core,w=c.winner;
- const rank=c.rank().map(f=>{const s=r.slots[f.i];let coins=0;if(s&&s.type=='human'&&s.uid){coins=REWARD.part+REWARD.ko*s.kos+(w&&w.i==f.i?REWARD.win:0);q.coins.run(coins,s.uid)}return {i:f.i,name:s?s.name:'?',skin:f.skin,kos:s?s.kos:0,coins}});
+ const all=c.rank(),rank=all.map(f=>{const s=r.slots[f.i];let coins=0,bd=null;if(s&&s.type=='human'&&s.uid){const place=all.indexOf(f),won=w&&w.i==f.i;bd={part:REWARD.part,ko:REWARD.ko*Math.min(s.kos,9),place:w?REWARD.place[place]||0:0};coins=grant(s.uid,'online',bd.part+bd.ko+bd.place);if(won)coins+=(bd.firstWin=onceToday(s.uid,'firstwin',REWARD.firstWin))}return {i:f.i,name:s?s.name:'?',skin:f.skin,kos:s?s.kos:0,coins,bd}});
  for(const s of humans(r)){const u=q.byId.get(s.uid);s.ws.user=u;send(s.ws,{t:'end',winner:w?w.i:null,rank,coins:u.coins});send(s.ws,{t:'user',user:pub(u)})}
  r.state='lobby';r.core=null;r.slots=r.slots.map(s=>!s||s.type!='human'||!s.ws?(r.quick||!s?null:s.type=='cpu'&&!s.uid?s:null):Object.assign(s,{kos:0,inp:{b:0,e:0}}));
  if(r.quick)r.fillAt=Date.now()+QUICK_FILL_MS;if(!humans(r).length)return destroy(r);pushLobby(r)}

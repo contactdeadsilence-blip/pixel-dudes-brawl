@@ -1,6 +1,6 @@
 // Pixel Dudes Brawl - shared game simulation (runs in the browser AND on the Node server)
 (function(root){
-const PRICES=[0,0,0,0,150,150,150,200,200,200,250,250,250,300,300,300,400,400,500,500,750];
+const PRICES=[0,0,0,0,200,200,200,250,250,250,300,300,300,350,350,350,400,400,450,450,500];
 const STARTER=[0,1,2,3];
 function createCore(H){H=H||{};
 const W=480,T=16;const PCOL=['#e04848','#4a8fe0','#fee761','#a1e55a'];
