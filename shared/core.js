@@ -3,6 +3,11 @@
 const PRICES=[0,0,0,0,200,200,200,250,250,250,300,300,300,350,350,350,400,400,450,450,500];
 const STARTER=[0,1,2,3];
 const TIERS=[['BRONZE',0,'#c77b3f'],['SILVER',1100,'#c0c8d8'],['GOLD',1200,'#fee761'],['PLATINUM',1300,'#7fe0d0'],['DIAMOND',1400,'#8fb8ff']];
+const CHALLENGES=[{id:'play3',txt:'PLAY 3 MATCHES',n:3,r:40,k:'play'},{id:'kos10',txt:'LAND 10 KOS',n:10,r:50,k:'kos'},{id:'win2',txt:'WIN 2 MATCHES',n:2,r:60,k:'win'},
+ {id:'onl2',txt:'PLAY 2 ONLINE MATCHES',n:2,r:50,k:'online'},{id:'owin',txt:'WIN AN ONLINE MATCH',n:1,r:80,k:'owin'},{id:'kos3m',txt:'GET 3 KOS IN ONE MATCH',n:1,r:60,k:'kos3'},
+ {id:'flaw',txt:'WIN WITHOUT LOSING A STOCK',n:1,r:100,k:'flaw'},{id:'full4',txt:'PLAY A 4-FIGHTER MATCH',n:1,r:30,k:'four'}];
+function chalAdd(c,e){switch(c.k){case 'play':return 1;case 'kos':return e.kos|0;case 'win':return e.won?1:0;case 'online':return e.online?1:0;case 'owin':return e.online&&e.won?1:0;
+ case 'kos3':return (e.kos|0)>=3?1:0;case 'flaw':return e.flawless?1:0;case 'four':return e.players>=4?1:0;case 'mode':return e.mode==c.m?1:0;case 'modewin':return e.mode==c.m&&e.won?1:0}return 0}
 function tierOf(r){let t=TIERS[0];for(const x of TIERS)if(r>=x[1])t=x;return t[0]}
 function createCore(H){H=H||{};
 const W=480,T=16;const PCOL=['#e04848','#4a8fe0','#fee761','#a1e55a'];
@@ -83,6 +88,6 @@ function unsnap(a,f){f.x=a[0]/10;f.y=a[1]/10;f.vx=a[2]/10;f.vy=a[3]/10;f.face=a[
 return{ARENAS,T,PCOL,startFight,step,hitbox,onGround,snap,unsnap,rank,
  get F(){return F},get map(){return map},get arena(){return arena},get WW(){return WW},get WH(){return WH},get readyT(){return readyT},get endT(){return endT},get winner(){return winner},get hitstop(){return hitstop},get timer(){return timer},get tick(){return tick},get opts(){return opts},
  setCPU(i,v){const f=F.find(f=>f.i==i);if(f)f.cpu=v}}}
-const api={createCore,PRICES,STARTER,TIERS,tierOf};
+const api={createCore,PRICES,STARTER,TIERS,tierOf,CHALLENGES,chalAdd};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.PDBCore=api;
 })(typeof window!=='undefined'?window:globalThis);

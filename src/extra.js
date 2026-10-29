@@ -25,3 +25,21 @@ const _drawLobbyx=drawLobby;drawLobby=function(){_drawLobbyx();const L=NET.lobby
 const _drawResx=drawResults;drawResults=function(){_drawResx();const R=NET.res;if(!R)return;const me=R.rank.find(r=>r.i==NET.you);
  if(me&&me.rank){const k=me.rank;if(ACC.user){ACC.user.rating=k.rating;ACC.user.tier=k.tier}text('RATING '+k.old+' \u2192 '+k.rating+' ('+(k.delta>=0?'+':'')+k.delta+')  '+k.tier,W/2,178,k.delta>=0?'#7fe07f':'#ff7f7f',8,'center')}
  R.rank.forEach((r,k)=>{if(r.rank){const y=70+k*30;text((r.rank.delta>=0?'+':'')+r.rank.delta,120+r.name.length*8+6,y+17,r.rank.delta>=0?'#7fe07f':'#ff7f7f',8)}})};
+// ===== Daily challenges =====
+UIS.add('chal');ONL_ITEMS.splice(ONL_ITEMS.indexOf('SHOP'),0,'CHALLENGES');
+const CHS={data:null,err:null,back:'menu',at:0};
+function goChal(){CHS.back=state;if(!ACC.user){openLogin('menu');toast('LOG IN FOR DAILY CHALLENGES');return}CHS.data=null;CHS.err=null;state='chal';
+ api('challenges').then(j=>{CHS.data=j;CHS.at=Date.now()}).catch(()=>CHS.err='COULD NOT LOAD')}
+function chalToast(list){if(!list||!list.length)return;list.forEach((c,k)=>setTimeout(()=>{toast('CHALLENGE DONE: '+c.txt+' +'+c.reward);SFX.coin()},1200+k*1600))}
+const _updOnl2=updOnlineMenu;updOnlineMenu=function(){if(ONL_ITEMS[onlSel]=='CHALLENGES'&&mOK()){SFX.ok();goChal();return}_updOnl2()};
+function updChal(){if(mBack()||mOK()){SFX.back();state=CHS.back=='online'?'online':'menu'}}
+function drawChal(){text('DAILY CHALLENGES',W/2,30,PAL.Y,32,'center');acctBadge(W-4,4,'right');panel(70,42,340,164);
+ if(!CHS.data){text(CHS.err||'LOADING...',W/2,128,'#ffffff',16,'center')}else{
+  CHS.data.list.forEach((c,k)=>{const y=52+k*46;panel(80,y,320,40,c.done?'#2f4a3a':'#3b3f52');text(c.txt,90,y+16,c.done?'#a1e55a':'#ffffff',16);
+   ctx.fillStyle='#1a1c2c';ctx.fillRect(90,y+24,200,8);ctx.fillStyle=c.done?'#a1e55a':PAL.Y;ctx.fillRect(90,y+24,Math.round(200*c.prog/c.n),8);
+   text(c.prog+'/'+c.n,296,y+32,'#d8dde6',8);if(c.done)text('DONE!',390,y+32,'#a1e55a',16,'right');else{coinIcon(352,y+25);text('+'+c.reward,362,y+32,'#fee761',8)}});
+  const s=Math.max(0,CHS.data.resetIn-Math.floor((Date.now()-CHS.at)/1000)),h=Math.floor(s/3600),m=Math.floor(s/60)%60;
+  text('NEW CHALLENGES IN '+h+'H '+m+'M',W/2,200,'#8b93a6',8,'center')}
+ text('PROGRESS COUNTS IN ONLINE MATCHES AND LOCAL MATCHES WHILE LOGGED IN',W/2,222,'#d8dde6',8,'center');bar([[['B'],'BACK']],[[['ESC'],'BACK']])}
+const _drawUIy=drawUI;drawUI=function(){if(state=='chal')drawChal();else _drawUIy()};
+const _updUIy=updUI;updUI=function(){if(state=='chal')updChal();else _updUIy()};

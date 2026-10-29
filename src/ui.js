@@ -22,8 +22,8 @@ function lockIcon(x,y,price){ctx.fillStyle='rgba(20,16,28,.6)';ctx.fillRect(x+1,
  if(price!=null){coinIcon(x+3,y+22);text(String(price),x+12,y+29,'#fee761',8)}}
 function acctBadge(x,y,al='left'){if(!ONLINE)return;const s=ACC.user?(ACC.user.username+'  '):'NOT SIGNED IN';const w=s.length*4+(ACC.user?String(ACC.user.coins).length*4+12:0)+8;const x0=al=='right'?x-w:x;panel(x0,y,w,13);text(s,x0+4,y+10,ACC.user?'#ffffff':'#8b93a6',8);if(ACC.user){const cx=x0+4+s.length*4;coinIcon(cx,y+3);text(String(ACC.user.coins),cx+9,y+10,'#fee761',8)}}
 // ===== Main menu =====
-let menuSel=0;const menuItems=()=>ONLINE?['LOCAL BATTLE','ONLINE','SHOP','SETTINGS']:['LOCAL BATTLE','SETTINGS'];
-function updMenu(){const it=menuItems();menuSel=listNav(it.length,menuSel);if(mOK()||mStart()){const o=it[menuSel];SFX.ok();if(o=='LOCAL BATTLE')state='select';else if(o=='SETTINGS')openSettings('menu');else if(o=='ONLINE')goOnline();else if(o=='SHOP')goShop()}}
+let menuSel=0;const menuItems=()=>ONLINE?['LOCAL BATTLE','ONLINE','CHALLENGES','SHOP','SETTINGS']:['LOCAL BATTLE','SETTINGS'];
+function updMenu(){const it=menuItems();menuSel=listNav(it.length,menuSel);if(mOK()||mStart()){const o=it[menuSel];SFX.ok();if(o=='LOCAL BATTLE')state='select';else if(o=='SETTINGS')openSettings('menu');else if(o=='ONLINE')goOnline();else if(o=='SHOP')goShop();else if(o=='CHALLENGES')goChal()}}
 function goOnline(){if(ACC.checking){toast('SIGNING IN...');return}if(ACC.user){state='online';onlSel=0}else openLogin('online')}
 function goShop(from){SH.back=from||state;if(ACC.user){state='shop';api('me').then(setUser).catch(()=>{})}else openLogin('shop')}
 function drawMenu(){text('PIXEL DUDES',W/2,58,PAL.Y,48,'center');text('BRAWL',W/2,96,'#ffffff',32,'center');
@@ -105,9 +105,9 @@ let onlSel=0;const ONL_ITEMS=['QUICK MATCH','CREATE PRIVATE ROOM','JOIN WITH COD
 function updOnlineMenu(){onlSel=listNav(ONL_ITEMS.length,onlSel);if(mBack()){state='menu';SFX.back();return}
  if(mOK()){const o=ONL_ITEMS[onlSel];SFX.ok();if(o=='QUICK MATCH'){NET.lobby=null;state='lobby';netOpen({t:'quick'})}else if(o=='CREATE PRIVATE ROOM'){NET.lobby=null;state='lobby';netOpen({t:'create'})}
   else if(o=='JOIN WITH CODE'){JC.code=['A','A','A','A'];JC.pos=0;state='joincode'}else if(o=='SHOP')goShop('online');else if(o=='LOG OUT'){logout();state='menu';toast('LOGGED OUT')}else state='menu'}}
-function drawOnlineMenu(){text('ONLINE',W/2,30,PAL.Y,32,'center');acctBadge(W/2,38,'center'==0?'left':'left');panel(W/2-110,58,220,ONL_ITEMS.length*19+12);drawList(ONL_ITEMS,onlSel,W/2,77,206,19);
- if(ACC.user&&ACC.user.guest)text('GUEST ACCOUNT - PROGRESS SAVED ON THIS DEVICE ONLY',W/2,186,'#8b93a6',8,'center');
- text('EARN COINS: PLAY 20  KO 15  WIN 50',W/2,200,'#fee761',8,'center');bar([[['DP'],'SELECT'],[['A'],'OK'],[['B'],'BACK']],[[['\u2191','\u2193'],'SELECT'],[['ENTER'],'OK'],[['ESC'],'BACK']])}
+function drawOnlineMenu(){text('ONLINE',W/2,30,PAL.Y,32,'center');acctBadge(W/2,38,'center'==0?'left':'left');panel(W/2-110,54,220,ONL_ITEMS.length*18+10);drawList(ONL_ITEMS,onlSel,W/2,72,206,18);
+ if(ACC.user&&ACC.user.guest)text('GUEST ACCOUNT - PROGRESS SAVED ON THIS DEVICE ONLY',W/2,230,'#8b93a6',8,'center');
+ text('EARN COINS: PLAY 20  KO 15  WIN 50',W/2,220,'#fee761',8,'center');bar([[['DP'],'SELECT'],[['A'],'OK'],[['B'],'BACK']],[[['\u2191','\u2193'],'SELECT'],[['ENTER'],'OK'],[['ESC'],'BACK']])}
 function updJoin(){const A='ABCDEFGHIJKLMNOPQRSTUVWXYZ';if(mL()&&!KP.KeyA){JC.pos=(JC.pos+3)%4;SFX.sel()}if(mR()&&!KP.KeyD){JC.pos=(JC.pos+1)%4;SFX.sel()}
  const cyc=d=>{JC.code[JC.pos]=A[(A.indexOf(JC.code[JC.pos])+d+26)%26];SFX.sel()};if(KP.ArrowUp||anyPad(i=>padRep(i,'up')))cyc(-1);if(KP.ArrowDown||anyPad(i=>padRep(i,'dn')))cyc(1);
  if(KP.Escape||anyPad(i=>padEdge(i,'B'))){state='online';SFX.back();return}
@@ -128,7 +128,7 @@ function netMsg(m){if(m.t=='lobby'){NET.lobby=m;if(state=='online'||state=='join
  else if(m.t=='start'){NET.you=m.you;NET.names=m.slots.map(s=>s?s.name:'');CORE.startFight(m.slots,m.arena,{stocks:m.stocks});syncCore();arena=m.arena;parts=[];NET.snaps=[];NET.rt=-1;NET.lb=-1;NET.res=null;opause=false;state='ofight';camUpdate(true)}
  else if(m.t=='snap'){if(state!='ofight'&&!(state=='settings'&&ST.back=='ofight'))return;NET.snaps.push(m);if(NET.snaps.length>40)NET.snaps.shift();
   for(const e of m.ev||[]){if(e[0]=='s'){SFX[e[1]]&&SFX[e[1]](e[2])}else if(e[0]=='k')addShake(e[1]);else if(e[0]=='b')burst(e[1],e[2],e[3],e[4],e[5]);else if(e[0]=='o')koFx(e[2],e[3],e[1]);else if(e[0]=='p')partFx(e[1],e[2])}}
- else if(m.t=='end'){NET.res=m;if(ACC.user&&m.coins!=null)ACC.user.coins=m.coins;const r=m.rank.find(r=>r.i==NET.you);if(r&&r.coins)setTimeout(()=>SFX.coin(),900);if(state=='settings')state='oresult';else state='oresult';opause=false}
+ else if(m.t=='end'){NET.res=m;chalToast(m.chal);if(ACC.user&&m.coins!=null)ACC.user.coins=m.coins;const r=m.rank.find(r=>r.i==NET.you);if(r&&r.coins)setTimeout(()=>SFX.coin(),900);if(state=='settings')state='oresult';else state='oresult';opause=false}
  else if(m.t=='user'){ACC.user=m.user}
  else if(m.t=='err'){toast(m.m);SFX.err();if(m.fatal&&state=='lobby')state='online'}}
 function netInput(){const any=a=>a.some(k=>K[k]),anyP=a=>a.some(k=>KP[k]);const o={};
@@ -211,7 +211,7 @@ const LC={ticket:null,res:null,busy:false,me:-1};
 const _sfRaw=startFight;startFight=function(){_sfRaw();LKOS.fill(0);LC.res=null;LC.ticket=null;LC.me=slots.findIndex(s=>s.type=='human');
  if(ONLINE&&ACC.user&&LC.me>=0)api('local/start',{}).then(j=>LC.ticket=j.ticket).catch(()=>{})};
 function localClaim(){const tk=LC.ticket;LC.ticket=null;if(!tk||!ACC.user)return;LC.busy=true;
- api('local/end',{ticket:tk,players:slots.filter(s=>s.type!='none').length,kos:LKOS[LC.me]||0,won:!!(winner&&winner.i==LC.me)}).then(j=>{LC.busy=false;LC.res=j;ACC.user=j.user;if(j.coins)setTimeout(()=>SFX.coin(),400)}).catch(()=>{LC.busy=false})}
+ api('local/end',{ticket:tk,players:slots.filter(s=>s.type!='none').length,kos:LKOS[LC.me]||0,won:!!(winner&&winner.i==LC.me),flawless:!!(winner&&winner.i==LC.me&&F[LC.me]&&F[LC.me].stocks>=SET.stocks),mode:typeof MODE!='undefined'?MODE.id:'stock'}).then(j=>{LC.busy=false;LC.res=j;ACC.user=j.user;chalToast(j.chal);if(j.coins)setTimeout(()=>SFX.coin(),400)}).catch(()=>{LC.busy=false})}
 let _prevState=null;const _updC=update;update=function(){_updC();if(state=='win'&&_prevState!='win')localClaim();_prevState=state};
 const _drawC=draw;draw=function(){_drawC();if(!ONLINE)return;ctx.save();ctx.setTransform(cv.width/W,0,0,cv.height/H,0,0);
  if(state=='menu'&&ACC.user)safe(()=>acctBadge(W-4,4,'right'));

@@ -5,6 +5,11 @@ const SKINS=["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABICAYAAABGOvOz
 const PRICES=[0,0,0,0,200,200,200,250,250,250,300,300,300,350,350,350,400,400,450,450,500];
 const STARTER=[0,1,2,3];
 const TIERS=[['BRONZE',0,'#c77b3f'],['SILVER',1100,'#c0c8d8'],['GOLD',1200,'#fee761'],['PLATINUM',1300,'#7fe0d0'],['DIAMOND',1400,'#8fb8ff']];
+const CHALLENGES=[{id:'play3',txt:'PLAY 3 MATCHES',n:3,r:40,k:'play'},{id:'kos10',txt:'LAND 10 KOS',n:10,r:50,k:'kos'},{id:'win2',txt:'WIN 2 MATCHES',n:2,r:60,k:'win'},
+ {id:'onl2',txt:'PLAY 2 ONLINE MATCHES',n:2,r:50,k:'online'},{id:'owin',txt:'WIN AN ONLINE MATCH',n:1,r:80,k:'owin'},{id:'kos3m',txt:'GET 3 KOS IN ONE MATCH',n:1,r:60,k:'kos3'},
+ {id:'flaw',txt:'WIN WITHOUT LOSING A STOCK',n:1,r:100,k:'flaw'},{id:'full4',txt:'PLAY A 4-FIGHTER MATCH',n:1,r:30,k:'four'}];
+function chalAdd(c,e){switch(c.k){case 'play':return 1;case 'kos':return e.kos|0;case 'win':return e.won?1:0;case 'online':return e.online?1:0;case 'owin':return e.online&&e.won?1:0;
+ case 'kos3':return (e.kos|0)>=3?1:0;case 'flaw':return e.flawless?1:0;case 'four':return e.players>=4?1:0;case 'mode':return e.mode==c.m?1:0;case 'modewin':return e.mode==c.m&&e.won?1:0}return 0}
 function tierOf(r){let t=TIERS[0];for(const x of TIERS)if(r>=x[1])t=x;return t[0]}
 function createCore(H){H=H||{};
 const W=480,T=16;const PCOL=['#e04848','#4a8fe0','#fee761','#a1e55a'];
@@ -85,7 +90,7 @@ function unsnap(a,f){f.x=a[0]/10;f.y=a[1]/10;f.vx=a[2]/10;f.vy=a[3]/10;f.face=a[
 return{ARENAS,T,PCOL,startFight,step,hitbox,onGround,snap,unsnap,rank,
  get F(){return F},get map(){return map},get arena(){return arena},get WW(){return WW},get WH(){return WH},get readyT(){return readyT},get endT(){return endT},get winner(){return winner},get hitstop(){return hitstop},get timer(){return timer},get tick(){return tick},get opts(){return opts},
  setCPU(i,v){const f=F.find(f=>f.i==i);if(f)f.cpu=v}}}
-const api={createCore,PRICES,STARTER,TIERS,tierOf};
+const api={createCore,PRICES,STARTER,TIERS,tierOf,CHALLENGES,chalAdd};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.PDBCore=api;
 })(typeof window!=='undefined'?window:globalThis);
 
@@ -483,8 +488,8 @@ function lockIcon(x,y,price){ctx.fillStyle='rgba(20,16,28,.6)';ctx.fillRect(x+1,
  if(price!=null){coinIcon(x+3,y+22);text(String(price),x+12,y+29,'#fee761',8)}}
 function acctBadge(x,y,al='left'){if(!ONLINE)return;const s=ACC.user?(ACC.user.username+'  '):'NOT SIGNED IN';const w=s.length*4+(ACC.user?String(ACC.user.coins).length*4+12:0)+8;const x0=al=='right'?x-w:x;panel(x0,y,w,13);text(s,x0+4,y+10,ACC.user?'#ffffff':'#8b93a6',8);if(ACC.user){const cx=x0+4+s.length*4;coinIcon(cx,y+3);text(String(ACC.user.coins),cx+9,y+10,'#fee761',8)}}
 // ===== Main menu =====
-let menuSel=0;const menuItems=()=>ONLINE?['LOCAL BATTLE','ONLINE','SHOP','SETTINGS']:['LOCAL BATTLE','SETTINGS'];
-function updMenu(){const it=menuItems();menuSel=listNav(it.length,menuSel);if(mOK()||mStart()){const o=it[menuSel];SFX.ok();if(o=='LOCAL BATTLE')state='select';else if(o=='SETTINGS')openSettings('menu');else if(o=='ONLINE')goOnline();else if(o=='SHOP')goShop()}}
+let menuSel=0;const menuItems=()=>ONLINE?['LOCAL BATTLE','ONLINE','CHALLENGES','SHOP','SETTINGS']:['LOCAL BATTLE','SETTINGS'];
+function updMenu(){const it=menuItems();menuSel=listNav(it.length,menuSel);if(mOK()||mStart()){const o=it[menuSel];SFX.ok();if(o=='LOCAL BATTLE')state='select';else if(o=='SETTINGS')openSettings('menu');else if(o=='ONLINE')goOnline();else if(o=='SHOP')goShop();else if(o=='CHALLENGES')goChal()}}
 function goOnline(){if(ACC.checking){toast('SIGNING IN...');return}if(ACC.user){state='online';onlSel=0}else openLogin('online')}
 function goShop(from){SH.back=from||state;if(ACC.user){state='shop';api('me').then(setUser).catch(()=>{})}else openLogin('shop')}
 function drawMenu(){text('PIXEL DUDES',W/2,58,PAL.Y,48,'center');text('BRAWL',W/2,96,'#ffffff',32,'center');
@@ -566,9 +571,9 @@ let onlSel=0;const ONL_ITEMS=['QUICK MATCH','CREATE PRIVATE ROOM','JOIN WITH COD
 function updOnlineMenu(){onlSel=listNav(ONL_ITEMS.length,onlSel);if(mBack()){state='menu';SFX.back();return}
  if(mOK()){const o=ONL_ITEMS[onlSel];SFX.ok();if(o=='QUICK MATCH'){NET.lobby=null;state='lobby';netOpen({t:'quick'})}else if(o=='CREATE PRIVATE ROOM'){NET.lobby=null;state='lobby';netOpen({t:'create'})}
   else if(o=='JOIN WITH CODE'){JC.code=['A','A','A','A'];JC.pos=0;state='joincode'}else if(o=='SHOP')goShop('online');else if(o=='LOG OUT'){logout();state='menu';toast('LOGGED OUT')}else state='menu'}}
-function drawOnlineMenu(){text('ONLINE',W/2,30,PAL.Y,32,'center');acctBadge(W/2,38,'center'==0?'left':'left');panel(W/2-110,58,220,ONL_ITEMS.length*19+12);drawList(ONL_ITEMS,onlSel,W/2,77,206,19);
- if(ACC.user&&ACC.user.guest)text('GUEST ACCOUNT - PROGRESS SAVED ON THIS DEVICE ONLY',W/2,186,'#8b93a6',8,'center');
- text('EARN COINS: PLAY 20  KO 15  WIN 50',W/2,200,'#fee761',8,'center');bar([[['DP'],'SELECT'],[['A'],'OK'],[['B'],'BACK']],[[['\u2191','\u2193'],'SELECT'],[['ENTER'],'OK'],[['ESC'],'BACK']])}
+function drawOnlineMenu(){text('ONLINE',W/2,30,PAL.Y,32,'center');acctBadge(W/2,38,'center'==0?'left':'left');panel(W/2-110,54,220,ONL_ITEMS.length*18+10);drawList(ONL_ITEMS,onlSel,W/2,72,206,18);
+ if(ACC.user&&ACC.user.guest)text('GUEST ACCOUNT - PROGRESS SAVED ON THIS DEVICE ONLY',W/2,230,'#8b93a6',8,'center');
+ text('EARN COINS: PLAY 20  KO 15  WIN 50',W/2,220,'#fee761',8,'center');bar([[['DP'],'SELECT'],[['A'],'OK'],[['B'],'BACK']],[[['\u2191','\u2193'],'SELECT'],[['ENTER'],'OK'],[['ESC'],'BACK']])}
 function updJoin(){const A='ABCDEFGHIJKLMNOPQRSTUVWXYZ';if(mL()&&!KP.KeyA){JC.pos=(JC.pos+3)%4;SFX.sel()}if(mR()&&!KP.KeyD){JC.pos=(JC.pos+1)%4;SFX.sel()}
  const cyc=d=>{JC.code[JC.pos]=A[(A.indexOf(JC.code[JC.pos])+d+26)%26];SFX.sel()};if(KP.ArrowUp||anyPad(i=>padRep(i,'up')))cyc(-1);if(KP.ArrowDown||anyPad(i=>padRep(i,'dn')))cyc(1);
  if(KP.Escape||anyPad(i=>padEdge(i,'B'))){state='online';SFX.back();return}
@@ -589,7 +594,7 @@ function netMsg(m){if(m.t=='lobby'){NET.lobby=m;if(state=='online'||state=='join
  else if(m.t=='start'){NET.you=m.you;NET.names=m.slots.map(s=>s?s.name:'');CORE.startFight(m.slots,m.arena,{stocks:m.stocks});syncCore();arena=m.arena;parts=[];NET.snaps=[];NET.rt=-1;NET.lb=-1;NET.res=null;opause=false;state='ofight';camUpdate(true)}
  else if(m.t=='snap'){if(state!='ofight'&&!(state=='settings'&&ST.back=='ofight'))return;NET.snaps.push(m);if(NET.snaps.length>40)NET.snaps.shift();
   for(const e of m.ev||[]){if(e[0]=='s'){SFX[e[1]]&&SFX[e[1]](e[2])}else if(e[0]=='k')addShake(e[1]);else if(e[0]=='b')burst(e[1],e[2],e[3],e[4],e[5]);else if(e[0]=='o')koFx(e[2],e[3],e[1]);else if(e[0]=='p')partFx(e[1],e[2])}}
- else if(m.t=='end'){NET.res=m;if(ACC.user&&m.coins!=null)ACC.user.coins=m.coins;const r=m.rank.find(r=>r.i==NET.you);if(r&&r.coins)setTimeout(()=>SFX.coin(),900);if(state=='settings')state='oresult';else state='oresult';opause=false}
+ else if(m.t=='end'){NET.res=m;chalToast(m.chal);if(ACC.user&&m.coins!=null)ACC.user.coins=m.coins;const r=m.rank.find(r=>r.i==NET.you);if(r&&r.coins)setTimeout(()=>SFX.coin(),900);if(state=='settings')state='oresult';else state='oresult';opause=false}
  else if(m.t=='user'){ACC.user=m.user}
  else if(m.t=='err'){toast(m.m);SFX.err();if(m.fatal&&state=='lobby')state='online'}}
 function netInput(){const any=a=>a.some(k=>K[k]),anyP=a=>a.some(k=>KP[k]);const o={};
@@ -672,7 +677,7 @@ const LC={ticket:null,res:null,busy:false,me:-1};
 const _sfRaw=startFight;startFight=function(){_sfRaw();LKOS.fill(0);LC.res=null;LC.ticket=null;LC.me=slots.findIndex(s=>s.type=='human');
  if(ONLINE&&ACC.user&&LC.me>=0)api('local/start',{}).then(j=>LC.ticket=j.ticket).catch(()=>{})};
 function localClaim(){const tk=LC.ticket;LC.ticket=null;if(!tk||!ACC.user)return;LC.busy=true;
- api('local/end',{ticket:tk,players:slots.filter(s=>s.type!='none').length,kos:LKOS[LC.me]||0,won:!!(winner&&winner.i==LC.me)}).then(j=>{LC.busy=false;LC.res=j;ACC.user=j.user;if(j.coins)setTimeout(()=>SFX.coin(),400)}).catch(()=>{LC.busy=false})}
+ api('local/end',{ticket:tk,players:slots.filter(s=>s.type!='none').length,kos:LKOS[LC.me]||0,won:!!(winner&&winner.i==LC.me),flawless:!!(winner&&winner.i==LC.me&&F[LC.me]&&F[LC.me].stocks>=SET.stocks),mode:typeof MODE!='undefined'?MODE.id:'stock'}).then(j=>{LC.busy=false;LC.res=j;ACC.user=j.user;chalToast(j.chal);if(j.coins)setTimeout(()=>SFX.coin(),400)}).catch(()=>{LC.busy=false})}
 let _prevState=null;const _updC=update;update=function(){_updC();if(state=='win'&&_prevState!='win')localClaim();_prevState=state};
 const _drawC=draw;draw=function(){_drawC();if(!ONLINE)return;ctx.save();ctx.setTransform(cv.width/W,0,0,cv.height/H,0,0);
  if(state=='menu'&&ACC.user)safe(()=>acctBadge(W-4,4,'right'));
@@ -708,6 +713,24 @@ const _drawLobbyx=drawLobby;drawLobby=function(){_drawLobbyx();const L=NET.lobby
 const _drawResx=drawResults;drawResults=function(){_drawResx();const R=NET.res;if(!R)return;const me=R.rank.find(r=>r.i==NET.you);
  if(me&&me.rank){const k=me.rank;if(ACC.user){ACC.user.rating=k.rating;ACC.user.tier=k.tier}text('RATING '+k.old+' \u2192 '+k.rating+' ('+(k.delta>=0?'+':'')+k.delta+')  '+k.tier,W/2,178,k.delta>=0?'#7fe07f':'#ff7f7f',8,'center')}
  R.rank.forEach((r,k)=>{if(r.rank){const y=70+k*30;text((r.rank.delta>=0?'+':'')+r.rank.delta,120+r.name.length*8+6,y+17,r.rank.delta>=0?'#7fe07f':'#ff7f7f',8)}})};
+// ===== Daily challenges =====
+UIS.add('chal');ONL_ITEMS.splice(ONL_ITEMS.indexOf('SHOP'),0,'CHALLENGES');
+const CHS={data:null,err:null,back:'menu',at:0};
+function goChal(){CHS.back=state;if(!ACC.user){openLogin('menu');toast('LOG IN FOR DAILY CHALLENGES');return}CHS.data=null;CHS.err=null;state='chal';
+ api('challenges').then(j=>{CHS.data=j;CHS.at=Date.now()}).catch(()=>CHS.err='COULD NOT LOAD')}
+function chalToast(list){if(!list||!list.length)return;list.forEach((c,k)=>setTimeout(()=>{toast('CHALLENGE DONE: '+c.txt+' +'+c.reward);SFX.coin()},1200+k*1600))}
+const _updOnl2=updOnlineMenu;updOnlineMenu=function(){if(ONL_ITEMS[onlSel]=='CHALLENGES'&&mOK()){SFX.ok();goChal();return}_updOnl2()};
+function updChal(){if(mBack()||mOK()){SFX.back();state=CHS.back=='online'?'online':'menu'}}
+function drawChal(){text('DAILY CHALLENGES',W/2,30,PAL.Y,32,'center');acctBadge(W-4,4,'right');panel(70,42,340,164);
+ if(!CHS.data){text(CHS.err||'LOADING...',W/2,128,'#ffffff',16,'center')}else{
+  CHS.data.list.forEach((c,k)=>{const y=52+k*46;panel(80,y,320,40,c.done?'#2f4a3a':'#3b3f52');text(c.txt,90,y+16,c.done?'#a1e55a':'#ffffff',16);
+   ctx.fillStyle='#1a1c2c';ctx.fillRect(90,y+24,200,8);ctx.fillStyle=c.done?'#a1e55a':PAL.Y;ctx.fillRect(90,y+24,Math.round(200*c.prog/c.n),8);
+   text(c.prog+'/'+c.n,296,y+32,'#d8dde6',8);if(c.done)text('DONE!',390,y+32,'#a1e55a',16,'right');else{coinIcon(352,y+25);text('+'+c.reward,362,y+32,'#fee761',8)}});
+  const s=Math.max(0,CHS.data.resetIn-Math.floor((Date.now()-CHS.at)/1000)),h=Math.floor(s/3600),m=Math.floor(s/60)%60;
+  text('NEW CHALLENGES IN '+h+'H '+m+'M',W/2,200,'#8b93a6',8,'center')}
+ text('PROGRESS COUNTS IN ONLINE MATCHES AND LOCAL MATCHES WHILE LOGGED IN',W/2,222,'#d8dde6',8,'center');bar([[['B'],'BACK']],[[['ESC'],'BACK']])}
+const _drawUIy=drawUI;drawUI=function(){if(state=='chal')drawChal();else _drawUIy()};
+const _updUIy=updUI;updUI=function(){if(state=='chal')updChal();else _updUIy()};
 
 // ===== Title screen (first thing shown) =====
 const VERSION='v1.3.0';

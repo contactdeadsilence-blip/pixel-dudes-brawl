@@ -44,6 +44,19 @@ function grant(uid,kind,amt){if(amt>0){q.coins.run(amt,uid);eq.add.run(uid,dayKe
 function onceToday(uid,kind,amt){return eq.has.get(uid,dayKey(),kind)?0:grant(uid,kind,amt)}
 function dailyLogin(u){if(u.guest)return 0;return onceToday(u.id,'login',REWARD.daily)}
 app.post('/api/daily',auth,(req,res)=>{const n=dailyLogin(req.user);res.json({bonus:n,user:pub(q.byId.get(req.user.id))})});
+// ===== Daily challenges: 3 per account per day, progress tracked here =====
+db.exec('CREATE TABLE IF NOT EXISTS chal(user_id INTEGER,day TEXT,slot INTEGER,cid TEXT,prog INTEGER DEFAULT 0,done INTEGER DEFAULT 0,PRIMARY KEY(user_id,day,slot))');
+const CHAL=PDB.CHALLENGES,CH={get:db.prepare('SELECT * FROM chal WHERE user_id=? AND day=? ORDER BY slot'),ins:db.prepare('INSERT OR IGNORE INTO chal(user_id,day,slot,cid) VALUES(?,?,?,?)'),
+ set:db.prepare('UPDATE chal SET prog=?,done=? WHERE user_id=? AND day=? AND slot=?')};
+function hashStr(s){let h=2166136261;for(const c of s)h=Math.imul(h^c.charCodeAt(0),16777619)>>>0;return h}
+function chalRows(uid){const d=dayKey();let rows=CH.get.all(uid,d);if(rows.length<3){const ids=CHAL.map(c=>c.id),pick=[];let h=hashStr(uid+':'+d);
+  while(pick.length<3){h=Math.imul(h^(h>>>13),2654435761)>>>0;const id=ids[h%ids.length];if(!pick.includes(id))pick.push(id)}pick.forEach((id,k)=>CH.ins.run(uid,d,k,id));rows=CH.get.all(uid,d)}return rows}
+const chalView=uid=>chalRows(uid).map(r=>{const c=CHAL.find(c=>c.id==r.cid)||{txt:r.cid,n:1,r:0};return {id:r.cid,txt:c.txt,n:c.n,prog:Math.min(r.prog,c.n),done:!!r.done,reward:c.r}});
+// ev: {won, kos, online, flawless, players, mode}
+function chalProgress(uid,ev){const done=[];const d=dayKey();for(const r of chalRows(uid)){if(r.done)continue;const c=CHAL.find(c=>c.id==r.cid);if(!c)continue;const add=PDB.chalAdd(c,ev);if(!add)continue;
+  const p=Math.min(c.n,r.prog+add),fin=p>=c.n;CH.set.run(p,fin?1:0,uid,d,r.slot);if(fin){grant(uid,'chal',c.r);done.push({txt:c.txt,reward:c.r})}}return done}
+const msToReset=()=>{const n=Date.now()-8*36e5;return 864e5-(n%864e5)};
+app.get('/api/challenges',auth,(req,res)=>res.json({list:chalView(req.user.id),resetIn:Math.round(msToReset()/1000)}));
 // local / vs-CPU play: server issues a ticket at match start and validates the claim (time, KO caps, daily cap)
 app.post('/api/local/start',auth,(req,res)=>{const id=crypto.randomBytes(12).toString('hex');LOCAL.tickets.set(id,{uid:req.user.id,at:Date.now()});
  for(const [k,v] of LOCAL.tickets)if(Date.now()-v.at>36e5)LOCAL.tickets.delete(k);res.json({ticket:id})});
@@ -55,7 +68,8 @@ app.post('/api/local/end',auth,(req,res)=>{const b=req.body||{},tk=LOCAL.tickets
  const bd={part:LOCAL.part,ko:LOCAL.ko*kos,win:won?LOCAL.win:0};let tot=Math.min(LOCAL.maxMatch,bd.part+bd.ko+bd.win);
  const left=Math.max(0,LOCAL.dayCap-eq.sum.get(req.user.id,dayKey(),'local').s);let capped=tot>left;tot=Math.min(tot,left);grant(req.user.id,'local',tot);
  bd.firstWin=won&&tot>0?onceToday(req.user.id,'firstwin',REWARD.firstWin):0;
- res.json({coins:tot+bd.firstWin,breakdown:bd,capped,user:pub(q.byId.get(req.user.id))})});
+ const chal=chalProgress(req.user.id,{won,kos,online:false,flawless:won&&!!b.flawless,players,mode:String(b.mode||'stock')});
+ res.json({chal,coins:tot+bd.firstWin,breakdown:bd,capped,user:pub(q.byId.get(req.user.id))})});
 app.post('/api/logout',auth,(req,res)=>{q.delTok.run(req.token);res.json({ok:true})});
 app.get('/api/me',auth,(req,res)=>res.json({user:pub(req.user)}));
 app.post('/api/settings',auth,(req,res)=>{const s=req.body&&req.body.settings;if(!s||typeof s!='object'||Array.isArray(s))return res.status(400).json({error:'bad settings'});
@@ -115,9 +129,9 @@ function tickRoom(r){const c=r.core;let res;try{res=c.step(i=>{const s=r.slots[i
  if(c.tick%2==0||res){const m=JSON.stringify({t:'snap',tick:c.tick,F:c.snap(),readyT:c.readyT,endT:c.endT,timer:c.timer,ev:r.ev.splice(0)});for(const s of humans(r))if(s.ws.readyState==1)s.ws.send(m)}
  if(res=='win')endMatch(r)}
 function endMatch(r){clearInterval(r.loop);r.loop=null;const c=r.core,w=c.winner;
- const all=c.rank(),rank=all.map(f=>{const s=r.slots[f.i];let coins=0,bd=null;if(s&&s.type=='human'&&s.uid){const place=all.indexOf(f),won=w&&w.i==f.i;bd={part:REWARD.part,ko:REWARD.ko*Math.min(s.kos,9),place:w?REWARD.place[place]||0:0};coins=grant(s.uid,'online',bd.part+bd.ko+bd.place);if(won)coins+=(bd.firstWin=onceToday(s.uid,'firstwin',REWARD.firstWin))}return {i:f.i,name:s?s.name:'?',skin:f.skin,kos:s?s.kos:0,coins,bd}});
+ const all=c.rank(),rank=all.map(f=>{const s=r.slots[f.i];let coins=0,bd=null;if(s&&s.type=='human'&&s.uid){const place=all.indexOf(f),won=w&&w.i==f.i;bd={part:REWARD.part,ko:REWARD.ko*Math.min(s.kos,9),place:w?REWARD.place[place]||0:0};coins=grant(s.uid,'online',bd.part+bd.ko+bd.place);if(won)coins+=(bd.firstWin=onceToday(s.uid,'firstwin',REWARD.firstWin))}let chal=null;if(s&&s.type=='human'&&s.uid&&s.ws){chal=chalProgress(s.uid,{won:!!(w&&w.i==f.i),kos:s.kos,online:true,flawless:!!(w&&w.i==f.i)&&f.stocks>=ONLINE_RULES.stocks,players:all.length,mode:r.mode||'stock'});s.chal=chal}return {i:f.i,name:s?s.name:'?',skin:f.skin,kos:s?s.kos:0,coins,bd}});
  if(r.quick){const rt=rateMatch(all.map((f,k)=>{const s=r.slots[f.i];return {uid:s&&s.type=='human'&&s.ws?s.uid:null,guest:s&&s.ws&&s.ws.user.guest,place:w?k:0,won:!!(w&&w.i==f.i)}}));rank.forEach(x=>{const s=r.slots[x.i];if(s&&s.uid&&rt[s.uid])x.rank=rt[s.uid]})}
- for(const s of humans(r)){const u=q.byId.get(s.uid);s.ws.user=u;send(s.ws,{t:'end',winner:w?w.i:null,rank,coins:u.coins});send(s.ws,{t:'user',user:pub(u)})}
+ for(const s of humans(r)){const u=q.byId.get(s.uid);s.ws.user=u;send(s.ws,{t:'end',chal:s.chal||[],winner:w?w.i:null,rank,coins:u.coins});send(s.ws,{t:'user',user:pub(u)})}
  r.state='lobby';r.core=null;r.slots=r.slots.map(s=>!s||s.type!='human'||!s.ws?(r.quick||!s?null:s.type=='cpu'&&!s.uid?s:null):Object.assign(s,{kos:0,inp:{b:0,e:0}}));
  if(r.quick)r.fillAt=Date.now()+QUICK_FILL_MS;if(!humans(r).length)return destroy(r);pushLobby(r)}
 setInterval(()=>{const now=Date.now();for(const r of rooms.values()){if(r.state!='lobby')continue;const n=humans(r).length;
