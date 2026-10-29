@@ -124,7 +124,7 @@ function startMatch(r){r.state='fight';r.countAt=0;r.fillAt=0;if(r.quick)r.arena
  const slots=r.slots.map(s=>s?{type:s.type,skin:s.skin,name:s.name}:{type:'none'});r.core.startFight(slots,r.arena,Object.assign({},ONLINE_RULES,{mode:r.mode||'stock',items:r.items|0,ff:!!r.ff}));
  humans(r).forEach(s=>send(s.ws,{t:'start',you:r.slots.indexOf(s),slots:r.slots.map(s=>s?{type:s.type,skin:s.skin,name:s.name}:null),arena:r.arena,stocks:ONLINE_RULES.stocks,mode:r.core.opts.mode,time:r.core.opts.time,items:r.items|0,ff:!!r.ff}));
  r.loop=setInterval(()=>tickRoom(r),1000/60)}
-const BITS=['l','r','u','d','a','s'],EB=['upE','dE','ap','sp'];
+const BITS=['l','r','u','d','a','s','x'],EB=['upE','dE','ap','sp','xp'];
 function tickRoom(r){const c=r.core;let res;try{res=c.step(i=>{const s=r.slots[i];if(!s||!s.inp)return {};const o={};BITS.forEach((k,j)=>o[k]=!!(s.inp.b&1<<j));EB.forEach((k,j)=>o[k]=!!(s.inp.e&1<<j));s.inp.e=0;return o})}catch(e){console.error('step',e);res='win'}
  if(c.tick%2==0||res){const m=JSON.stringify({t:'snap',tick:c.tick,F:c.snap(),X:c.snapX(),readyT:c.readyT,endT:c.endT,timer:c.timer,ev:r.ev.splice(0)});for(const s of humans(r))if(s.ws.readyState==1)s.ws.send(m)}
  if(res=='win')endMatch(r)}
@@ -157,7 +157,7 @@ wss.on('connection',(ws,req)=>{const tok=new URL(req.url,'http://x').searchParam
    case 'addcpu':if(r&&!r.quick&&r.host===ws&&r.state=='lobby'){addCPU(r);pushLobby(r)}break;
    case 'delcpu':if(r&&!r.quick&&r.host===ws&&r.state=='lobby'){for(let i=3;i>=0;i--)if(r.slots[i]&&r.slots[i].type=='cpu'){r.slots[i]=null;break}pushLobby(r)}break;
    case 'start':if(r&&!r.quick&&r.host===ws&&r.state=='lobby'){if(r.slots.filter(Boolean).length<2)send(ws,{t:'err',m:'NEED 2+ FIGHTERS'});else startMatch(r)}break;
-   case 'in':{if(!r||r.state!='fight')break;const s=r.slots.find(s=>s&&s.ws===ws);if(s){s.inp.b=(m.b|0)&63;s.inp.e|=(m.e|0)&15}break}
+   case 'in':{if(!r||r.state!='fight')break;const s=r.slots.find(s=>s&&s.ws===ws);if(s){s.inp.b=(m.b|0)&127;s.inp.e|=(m.e|0)&31}break}
   }});
  ws.on('close',()=>leave(ws));ws.on('error',()=>{})});
 if(require.main===module)server.listen(PORT,()=>console.log('Pixel Dudes Brawl server on http://localhost:'+PORT));

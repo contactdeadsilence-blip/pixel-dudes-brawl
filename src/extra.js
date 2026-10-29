@@ -50,7 +50,7 @@ const ITEM_PAL={o:'#3b2c2e','#':'#5a5a6e',y:'#fee761',c:'#7fe0d0',w:'#ffffff',g:
 function itemSprite(k){return cacheCanvas('item_'+k,8,8,()=>{ITEM_ART[k].forEach((row,y)=>[...row].forEach((ch,x)=>{const c=ITEM_PAL[ch];if(c){ctx.fillStyle=c;ctx.fillRect(x+1,y+1,1,1)}}))})}
 function drawItems(){for(const it of CORE.items){if(it.life<120&&Math.floor(t/4)%2)continue;const k=PDBCore.ITEM_KINDS[it.k],bob=Math.round(Math.sin(t/12+it.x)*1);
   const ix=Math.round(it.x)-3,iy=Math.round(it.y)-5+bob;ctx.fillStyle=PAL.o;ctx.fillRect(ix-1,iy-1,18,18);ctx.fillStyle=t%40<20?'#fee761':'#ffffff';ctx.fillRect(ix,iy,16,16);ctx.fillStyle='#262b44';ctx.fillRect(ix+1,iy+1,14,14);ctx.drawImage(itemSprite(k),ix,iy,16,16)}
- for(const p of CORE.projs){ctx.drawImage(itemSprite('bomb'),Math.round(p.x)-4,Math.round(p.y)-4,8,8);if(t%4<2){ctx.fillStyle='#fee761';ctx.fillRect(Math.round(p.x)+1,Math.round(p.y)-5,1,1)}}}
+ for(const p of CORE.projs){if(p.orb){const ox=Math.round(p.x),oy=Math.round(p.y),c=PCOL[p.o]||'#ffffff';ctx.fillStyle=PAL.o;ctx.fillRect(ox-4,oy-3,8,6);ctx.fillRect(ox-3,oy-4,6,8);ctx.fillStyle=c;ctx.fillRect(ox-3,oy-2,6,4);ctx.fillRect(ox-2,oy-3,4,6);ctx.fillStyle='#ffffff';ctx.fillRect(ox-1,oy-1,2,2);if(t%3==0&&parts.length<PMAX)parts.push({x:p.x,y:p.y+(Math.random()*4-2),vx:0,vy:0,l:8,c});continue}ctx.drawImage(itemSprite('bomb'),Math.round(p.x)-4,Math.round(p.y)-4,8,8);if(t%4<2){ctx.fillStyle='#fee761';ctx.fillRect(Math.round(p.x)+1,Math.round(p.y)-5,1,1)}}}
 function drawBuffs(){for(const f of F){if(f.out||f.respawn>0||!f.buf)continue;const B=f.buf,x=Math.round(f.x),y=Math.round(f.y);
   if(B.sh){ctx.globalAlpha=.35+.15*Math.sin(t/5);ctx.fillStyle='#7fe0d0';ctx.fillRect(x-3,y-3,16,26);ctx.globalAlpha=1;ctx.fillStyle='#7fe0d0';ctx.fillRect(x-3,y-3,16,1);ctx.fillRect(x-3,y+22,16,1);ctx.fillRect(x-3,y-3,1,26);ctx.fillRect(x+12,y-3,1,26)}
   if(B.spd&&t%3==0)parts.length<PMAX&&parts.push({x:f.x+5-f.face*5,y:f.y+16,vx:-f.face*.5,vy:0,l:10,c:'#fee761'});
@@ -75,3 +75,14 @@ function drawModeWorld(){const md=CORE.opts&&CORE.opts.mode,Hh=CORE.hill;
  if(md=='coin')for(const c of CORE.coins){const x=Math.round(c.x),y=Math.round(c.y),w=[6,4,2,4][Math.floor(t/6)%4];ctx.fillStyle=PAL.o;ctx.fillRect(x+4-w/2-1,y-1,w+2,10);ctx.fillStyle='#fee761';ctx.fillRect(x+4-w/2,y,w,8);ctx.fillStyle='#ffffff';ctx.fillRect(x+4-w/2,y+1,1,3)}
  if(md=='teams')for(const f of F){if(f.out||f.respawn>0)continue;ctx.fillStyle=TEAMC[f.team&1];ctx.fillRect(Math.round(f.x)-1,Math.round(f.y)+21,12,2)}}
 const _drawItems0=drawItems;drawItems=function(){drawModeWorld();_drawItems0()};
+
+// ===== Special moves (drawing + HUD pip) =====
+function drawSpecials(){for(const f of F){if(f.out||f.respawn>0||!(f.spT>0))continue;const x=Math.round(f.x),y=Math.round(f.y),c=PCOL[f.i];
+ if(f.spK=='u'){ctx.fillStyle='#fee761';for(let k=0;k<3;k++)ctx.fillRect(x-2+k*6,y-6-((t+k*2)%4),2,4);ctx.fillStyle=c;ctx.fillRect(x-3,y-8,16,2)}
+ else if(f.spK=='s'){ctx.fillStyle=c;for(let k=0;k<3;k++)ctx.fillRect(f.face>0?x-6-k*5:x+12+k*5-3,y+4+k*5,4,2);ctx.fillStyle='#ffffff';ctx.fillRect(f.face>0?x+10:x-2,y+3,2,14)}
+ else if(f.spK=='d'){ctx.fillStyle='#fee761';ctx.fillRect(x+1,y-6,2,5);ctx.fillRect(x+7,y-8,2,6);ctx.fillStyle=c;ctx.fillRect(x-1,y+20,12,2)}
+ else if(f.spK=='w'){const r=(9-f.spT)*3+6,gy=y+19;ctx.fillStyle='#fee761';ctx.fillRect(x+5-r,gy,4,2);ctx.fillRect(x+1+r,gy,4,2);ctx.fillStyle='#ffffff';ctx.fillRect(x+5-r+1,gy-2,2,2);ctx.fillRect(x+2+r,gy-2,2,2)}
+ else if(f.spK=='n'){ctx.fillStyle='#ffffff';ctx.fillRect(f.face>0?x+11:x-3,y+7,2,4)}}}
+const _drawBuffsS=drawBuffs;drawBuffs=function(){_drawBuffsS();drawSpecials()};
+const _hudPtsS=hudPts;hudPts=function(f,x,y){const r=_hudPtsS(f,x,y);if(!f.out){const ok=!(f.spCd>0);ctx.fillStyle=PAL.o;ctx.fillRect(x+101,y+21,9,9);ctx.fillStyle=ok?'#fee761':'#5d4a6e';ctx.fillRect(x+102,y+22,7,7);if(!ok){ctx.fillStyle='#8b93a6';const h=Math.round(7*(1-Math.min(1,f.spCd/80)));ctx.fillRect(x+102,y+29-h,7,h)}else{ctx.fillStyle='#ffffff';ctx.fillRect(x+103,y+23,2,2)}}return r};
+const TEAMN=['RED','BLUE'];

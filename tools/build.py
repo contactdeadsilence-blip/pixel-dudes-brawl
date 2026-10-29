@@ -76,7 +76,7 @@ R1("[[KC('ESC')],'BACK']],W/2,232)}\n  else{drawWorld();","[[KC('ESC')],'BACK']]
 R1("ctx.restore();ctx.save();drawIndicators();drawHUD();","ctx.restore();ctx.save();drawIndicators();drawHUD();const tm=state=='ofight'||state=='oresult'?NET.timer:CORE.timer;if(tm>0&&(state!='fight'||CORE.opts.time)){const s=Math.ceil(tm/60);panel(W/2-26,2,52,18);text(Math.floor(s/60)+':'+String(s%60).padStart(2,'0'),W/2,16,s<=10?'#e04848':'#ffffff',16,'center')}\n   safe(()=>{")
 R1("if(endT)text('GAME!',W/2,110,PAL.Y,48,'center');","if(endT)text(tm==0&&(CORE.opts.time||state!='fight')&&!(F.filter(f=>!f.out).length<=1)?'TIME!':'GAME!',W/2,110,PAL.Y,48,'center');")
 R1("ctx.fillRect(0,0,W,H);panel(90,30,300,190)","ctx.fillRect(-4e3,-4e3,9e3,9e3);panel(90,30,300,190)")
-R1("text((winner.cpu?'CPU ':'P')+(winner.i+1)+' WINS!'","text((winner.cpu?'CPU ':'P')+(winner.i+1)+' WINS!'")
+R1("text((winner.cpu?'CPU ':'P')+(winner.i+1)+' WINS!',W/2,66,PCOL[winner.i],32,'center')","text(CORE.opts.teams?'TEAM '+TEAMN[winner.team&1]+' WINS!':(winner.cpu?'CPU ':'P')+(winner.i+1)+' WINS!',W/2,66,CORE.opts.teams?TEAMC[winner.team&1]:PCOL[winner.i],32,'center')")
 i0=IDX("if(state=='fight'&&readyT<=0){");i1=IDX("toasts.slice(0,1)")
 rest=rest[:i0]+"""   if(state=='oresult')drawResults();
    if(state=='pause'||(state=='ofight'&&opause)){const O=state=='pause'?['RESUME','RESTART','SETTINGS','QUIT TO MENU']:['RESUME','SETTINGS','LEAVE MATCH'];ctx.fillStyle='rgba(59,44,46,.7)';ctx.fillRect(-4e3,-4e3,9e3,9e3);panel(120,40,240,170);text('PAUSED',W/2,78,PAL.Y,32,'center');
@@ -99,8 +99,28 @@ head=open(R+'/head.html').read().replace('<style>html,body{margin:0;background:#
  '<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><style>html,body{margin:0;padding:0;background:#000;width:100%;height:100%;overflow:hidden}canvas{position:fixed;left:0;top:0;display:block;image-rendering:pixelated;image-rendering:crisp-edges;width:100vw;height:100vh}</style>')
 assert 'overflow:hidden' in head
 tl=open(R+'/tail.html').read();core=open(P+'/shared/core.js').read()
+def post(js):
+  def X(a,b,n=None):
+    nonlocal js
+    c=js.count(a);assert c and (n is None or c==n),(a,c);js=js.replace(a,b)
+  for a,b in [("s:['KeyE'],lab","s:['KeyE'],x:['KeyZ'],lab"),("s:['KeyY'],lab","s:['KeyY'],x:['KeyV'],lab"),("s:['KeyO'],lab","s:['KeyO'],x:['KeyP'],lab"),("s:['Period','Numpad2'],lab","s:['Period','Numpad2'],x:['Comma','Numpad3'],lab")]:X(a,b,1)
+  X("['l','r','u','d','a','s']","['l','r','u','d','a','s','x']")
+  X("['u','l','d','r','a','s']","['u','l','d','r','a','s','x']",1)
+  X("['upE','dE','ap','sp']","['upE','dE','ap','sp','xp']",1)
+  X("'LB','RB','BK','ST','a','s']","'LB','RB','BK','ST','a','s','x']",1)
+  X("a:b(2),s:b(1)||b(3)}","a:b(2),s:b(1),x:b(3)}",1)
+  X("sp:anyP(m.s)};","sp:anyP(m.s),x:any(m.x),xp:anyP(m.x)};",1)
+  X("o.sp=o.sp||padEdge(sl.pad,'s')}","o.sp=o.sp||padEdge(sl.pad,'s');o.x=o.x||p.x;o.xp=o.xp||padEdge(sl.pad,'x')}",1)
+  X("o.sp=o.sp||anyP(m.s)}","o.sp=o.sp||anyP(m.s);o.xp=o.xp||anyP(m.x)}",1)
+  X("o.sp=o.sp||padEdge(pi,'s')}","o.sp=o.sp||padEdge(pi,'s');o.xp=o.xp||padEdge(pi,'x')}",1)
+  X("prompt([[[PB('DP')],'MOVE'],[[PB('A')],'JUMP']],x+55,y+72,'center',ps);prompt([[[PB('X')],'ATK'],[[PB('B')],'DASH']],x+55,y+86,'center',ps)","prompt([[[PB('DP')],'MOVE'],[[PB('A')],'JUMP']],x+55,y+66,'center',ps);prompt([[[PB('X')],'ATK'],[[PB('B')],'DASH']],x+55,y+78,'center',ps);prompt([[[PB('Y')],'SPECIAL']],x+55,y+90,'center',ps)",1)
+  X("'MOVE']],x+55,y+72);prompt([[[kcap(i,'a')],'ATK'],[[kcap(i,'s')],'DASH']],x+55,y+86)","'MOVE']],x+55,y+66);prompt([[[kcap(i,'a')],'ATK'],[[kcap(i,'s')],'DASH']],x+55,y+78);prompt([[[kcap(i,'x')],'SPECIAL']],x+55,y+90)",1)
+  X("['s','DASH']];","['s','DASH'],['x','SPECIAL']];",1)
+  X("A JUMP  X ATTACK  B DASH'","A JUMP  X ATK  B DASH  Y SPECIAL'",1)
+  return js
+
 for online,out in [(True,P+'/public/index.html'),(False,'/workspace/pixel-platformer/index.html')]:
-  js=core+'\n'+client(online)
+  js=post(core+'\n'+client(online))
   open('/tmp/chk_'+str(online)+'.js','w').write(js)
   os.makedirs(os.path.dirname(out),exist_ok=True)
   open(out,'w').write(head+js+'\n'+tl)
