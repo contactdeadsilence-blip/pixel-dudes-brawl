@@ -15,7 +15,8 @@ const q={byName:n=>db.get('SELECT * FROM users WHERE lower(username)=lower(?)',[
  tok:t=>db.get('SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=?',[t]),
  delTok:t=>db.run('DELETE FROM sessions WHERE token=?',[t]),setS:(j,id)=>db.run('UPDATE users SET settings=? WHERE id=?',[j,id]),
  coins:(a,id)=>db.run('UPDATE users SET coins=coins+? WHERE id=?',[a,id])};
-const pub=u=>({username:u.username,coins:u.coins,rating:u.rating,games:u.games,wins:u.wins,tier:PDB.tierOf(u.rating),unlocked:JSON.parse(u.unlocked||'[]'),settings:JSON.parse(u.settings||'{}'),guest:!!u.guest});
+const pub=u=>({username:u.username,coins:u.coins,rating:u.rating,games:u.games,wins:u.wins,tier:PDB.tierOf(u.rating),unlocked:JSON.parse(u.unlocked||'[]'),settings:JSON.parse(u.settings||'{}'),guest:!!u.guest,cosm:PDB.cosParse(u.cosm)});
+const eqOf=u=>u?PDB.cosParse(u.cosm).eq:{};
 const newSession=async u=>{const t=crypto.randomBytes(24).toString('hex');await db.run('INSERT INTO sessions(token,user_id,created) VALUES(?,?,?)',[t,u.id,Date.now()]);return t};
 // sliding 90-day sessions: each use extends the expiry; expired tokens are deleted and rejected
 async function userOf(t){if(!t)return null;t=String(t);const r=await db.get('SELECT created FROM sessions WHERE token=?',[t]);if(!r)return null;
@@ -82,6 +83,15 @@ app.post('/api/shop/buy',auth,H(async(req,res)=>{const skin=req.body&&req.body.s
  const r=await db.run('UPDATE users SET coins=coins-?,unlocked=? WHERE id=? AND coins>=? AND unlocked=?',[price,JSON.stringify(un),u.id,price,u.unlocked]);
  if(r.changes!=1)return res.status(409).json({error:'try again'});await db.run('INSERT INTO purchases(user_id,skin,price,ts) VALUES(?,?,?,?)',[u.id,skin,price,Date.now()]);
  res.json({user:pub(await q.byId(req.user.id))})}));
+// cosmetics: same optimistic compare-and-set guard as skins (coins and the cosm JSON must be unchanged since read)
+app.post('/api/shop/item',auth,H(async(req,res)=>{const id=req.body&&req.body.item,it=typeof id=='string'&&PDB.COS_BY[id];if(!it)return res.status(400).json({error:'unknown item'});
+ const u=await q.byId(req.user.id),c=PDB.cosParse(u.cosm);if(c.own.includes(id))return res.status(409).json({error:'already owned'});if(u.coins<it.p)return res.status(402).json({error:'not enough coins'});
+ c.own.push(id);c.eq[it.cat]=id;const r=await db.run('UPDATE users SET coins=coins-?,cosm=? WHERE id=? AND coins>=? AND cosm '+(db.kind=='pg'?'IS NOT DISTINCT FROM':'IS')+' ?',[it.p,JSON.stringify(c),u.id,it.p,u.cosm]);
+ if(r.changes!=1)return res.status(409).json({error:'try again'});await db.run('INSERT INTO purchases(user_id,skin,price,ts,item) VALUES(?,?,?,?,?)',[u.id,-1,it.p,Date.now(),id]);
+ res.json({user:pub(await q.byId(req.user.id))})}));
+app.post('/api/shop/equip',auth,H(async(req,res)=>{const b=req.body||{},cat=b.cat,id=b.item;if(!PDB.COS_CATS.includes(cat))return res.status(400).json({error:'unknown category'});
+ const u=await q.byId(req.user.id),c=PDB.cosParse(u.cosm);if(id==null)delete c.eq[cat];else{const it=PDB.COS_BY[id];if(!it||it.cat!=cat)return res.status(400).json({error:'unknown item'});if(!c.own.includes(id))return res.status(403).json({error:'not owned'});c.eq[cat]=id}
+ await db.run('UPDATE users SET cosm=? WHERE id=?',[JSON.stringify(c),u.id]);res.json({user:pub(await q.byId(req.user.id))})}));
 // Real-money coin packs are intentionally NOT implemented. Wire a payment provider here (e.g. Stripe Checkout + webhook that credits coins).
 app.post('/api/coins/checkout',auth,(req,res)=>res.status(501).json({error:'payments not configured'}));
 // ===== Ranked =====
@@ -130,12 +140,13 @@ function newRoom(quick){const r={code:mkCode(),quick,slots:[null,null,null,null]
 const humans=r=>r.slots.filter(s=>s&&s.type=='human'&&s.ws);
 function lobbyMsg(r,ws){const you=r.slots.findIndex(s=>s&&s.ws===ws),now=Date.now();
  return {t:'lobby',code:r.code,quick:r.quick,host:r.host===ws,you,arena:r.arena,mode:r.mode||'stock',items:r.items|0,ff:!!r.ff,
-  slots:r.slots.map(s=>{if(!s)return null;const rt=s.uid&&s.ws&&s.ws.user&&!s.ws.user.guest?s.ws.user.rating:null;return {type:s.type,name:s.name,skin:s.skin,host:s.ws&&s.ws===r.host,tier:rt!=null?PDB.tierOf(rt):null,rating:rt}}),ranked:r.quick,
+  slots:r.slots.map(s=>{if(!s)return null;const rt=s.uid&&s.ws&&s.ws.user&&!s.ws.user.guest?s.ws.user.rating:null;return {type:s.type,name:s.name,skin:s.skin,cos:s.cos||{},host:s.ws&&s.ws===r.host,tier:rt!=null?PDB.tierOf(rt):null,rating:rt}}),ranked:r.quick,
   count:r.countAt?Math.max(0,Math.ceil((r.countAt-now)/1000)):-1,fill:r.quick&&r.fillAt&&!r.countAt?Math.max(0,Math.ceil((r.fillAt-now)/1000)):-1}}
 const pushLobby=r=>{for(const s of humans(r))send(s.ws,lobbyMsg(r,s.ws))};
 function firstOwned(u,pref){const un=JSON.parse(u.unlocked);return un.includes(pref)?pref:un[0]}
+async function refreshUser(ws){if(!ws.user||!ws.user.id)return;try{const u=await q.byId(ws.user.id);if(u)ws.user=u}catch(e){}}
 function join(r,ws){const i=r.slots.findIndex(s=>!s);if(i<0||r.state!='lobby')return false;const u=ws.user;
- r.slots[i]={type:'human',ws,uid:u.id,name:u.username,skin:firstOwned(u,ws.pref!=null?ws.pref:[0,1,2,3][i]),inp:{b:0,e:0},kos:0};if(!r.host)r.host=ws;ws.room=r;pushLobby(r);return true}
+ r.slots[i]={type:'human',ws,uid:u.id,name:u.username,skin:firstOwned(u,ws.pref!=null?ws.pref:[0,1,2,3][i]),cos:eqOf(u),inp:{b:0,e:0},kos:0};if(!r.host)r.host=ws;ws.room=r;pushLobby(r);return true}
 function leave(ws){const r=ws.room;if(!r)return;ws.room=null;const i=r.slots.findIndex(s=>s&&s.ws===ws);
  if(i>=0){if(r.state=='fight'){const s=r.slots[i];s.type='cpu';s.ws=null;s.name+=' (CPU)';r.core.setCPU(i,true)}else r.slots[i]=null}
  if(r.host===ws){const h=humans(r)[0];r.host=h?h.ws:null}
@@ -144,13 +155,15 @@ function destroy(r){if(r.loop)clearTimeout(r.loop);r.loop=null;rooms.delete(r.co
 const CPU_NAMES=['BOLT','ZIGGY','MOCHI','RUSTY','PIXIE','TANK'];
 function addCPU(r){const i=r.slots.findIndex(s=>!s);if(i<0)return;const used=r.slots.filter(Boolean).map(s=>s.skin);let sk;do{sk=Math.floor(Math.random()*NS)}while(used.includes(sk)&&used.length<NS);
  r.slots[i]={type:'cpu',name:'CPU',skin:sk,kos:0}}
+// arena theme: the host's equipped theme, if it reskins the arena being played
+function roomTheme(r){const h=r.slots.find(s=>s&&s.ws&&s.ws===r.host),id=h&&h.cos&&h.cos.arena,it=id&&PDB.COS_BY[id];return it&&it.base==r.arena?id:null}
 function startMatch(r){r.state='fight';r.countAt=0;r.fillAt=0;if(r.quick)r.arena=Math.floor(Math.random()*4);
  const ev=[];r.ev=ev;r.slots.forEach(s=>{if(s)s.kos=0});
  r.core=PDB.createCore({sfx:(k,a)=>ev.push(a!=null?['s',k,a]:['s',k]),shake:v=>ev.push(['k',v]),burst:(x,y,c,n,sp)=>{if(ev.length<200)ev.push(['b',Math.round(x),Math.round(y),c,n,sp])},
-  part:(x,y)=>{if(ev.length<200)ev.push(['p',Math.round(x),Math.round(y)])},ko:f=>ev.push(['o',f.i,Math.round(f.x),Math.round(f.y)]),
+  part:(x,y)=>{if(ev.length<200)ev.push(['p',Math.round(x),Math.round(y)])},ko:f=>ev.push(['o',f.i,Math.round(f.x),Math.round(f.y),f.lastHit!=null&&f.lastHit!=f.i?f.lastHit:-1]),
   kill:(k,v)=>{if(k!=null&&k!==v&&r.slots[k])r.slots[k].kos++}});
  const slots=r.slots.map(s=>s?{type:s.type,skin:s.skin,name:s.name}:{type:'none'});r.core.startFight(slots,r.arena,Object.assign({},ONLINE_RULES,{mode:r.mode||'stock',items:r.items|0,ff:!!r.ff}));
- humans(r).forEach(s=>send(s.ws,{t:'start',you:r.slots.indexOf(s),slots:r.slots.map(s=>s?{type:s.type,skin:s.skin,name:s.name}:null),arena:r.arena,stocks:ONLINE_RULES.stocks,mode:r.core.opts.mode,time:r.core.opts.time,items:r.items|0,ff:!!r.ff}));
+ humans(r).forEach(s=>send(s.ws,{t:'start',you:r.slots.indexOf(s),slots:r.slots.map(s=>s?{type:s.type,skin:s.skin,name:s.name,cos:s.cos||{}}:null),th:roomTheme(r),arena:r.arena,stocks:ONLINE_RULES.stocks,mode:r.core.opts.mode,time:r.core.opts.time,items:r.items|0,ff:!!r.ff}));
  startLoop(r)}
 // Fixed-step 60 Hz loop: setInterval(16.67) really fires every ~16ms (62.5 Hz) and drifts/bunches on a shared CPU, which made the
 // client playback clock fall behind and jump. Track real time with an accumulator, catch up at most 4 steps, then resync.
@@ -186,13 +199,14 @@ wss.on('connection',(ws,req)=>{const tok=new URL(req.url,'http://x').searchParam
   if(!u){send(ws,{t:'err',m:'LOG IN FIRST',fatal:true});ws.close();return null}if(closed)return null;ws.user=u;WSU.set(u.id,(WSU.get(u.id)||0)+1);
   ws.on('close',()=>{WSU.set(u.id,Math.max(0,(WSU.get(u.id)||1)-1))});return u});
  ws.on('close',()=>{closed=true});
- ws.on('message',async d=>{if(!await authed||closed)return;let m;try{m=JSON.parse(d)}catch(e){return}if(!m||typeof m.t!='string')return;const r=ws.room;
+ ws.on('message',async d=>{if(!await authed||closed)return;let m;try{m=JSON.parse(d)}catch(e){return}if(!m||typeof m.t!='string')return;if(['quick','create','join'].includes(m.t))await refreshUser(ws);const r=ws.room;
   switch(m.t){
    case 'quick':{if(r)leave(ws);let room=[...rooms.values()].find(x=>x.quick&&x.state=='lobby'&&humans(x).length<4&&x.slots.some(s=>!s));if(!room)room=newRoom(true);join(room,ws);break}
    case 'create':{if(r)leave(ws);join(newRoom(false),ws);break}
    case 'join':{const room=rooms.get(String(m.code||'').toUpperCase());if(!room||room.quick){send(ws,{t:'err',m:'ROOM NOT FOUND',fatal:true});break}
     if(room.state!='lobby'){send(ws,{t:'err',m:'MATCH IN PROGRESS',fatal:true});break}if(r&&r!==room)leave(ws);if(!join(room,ws))send(ws,{t:'err',m:'ROOM FULL',fatal:true});break}
    case 'leave':leave(ws);break;
+   case 'cos':{if(!r||r.state!='lobby')break;const s=r.slots.find(s=>s&&s.ws===ws);if(!s)break;let u;try{u=await q.byId(ws.user.id)}catch(e){break}if(!u||ws.room!==r)break;ws.user=u;s.cos=eqOf(u);pushLobby(r);break}
    case 'skin':{if(!r||r.state!='lobby')break;const s=r.slots.find(s=>s&&s.ws===ws);const k=m.skin;if(!s||!Number.isInteger(k))break;
     let u;try{u=await q.byId(ws.user.id)}catch(e){break}if(!u)break;ws.user=u;const un=JSON.parse(u.unlocked);if(!un.includes(k)){send(ws,{t:'err',m:'SKIN LOCKED'});break}if(ws.room!==r||r.state!='lobby')break;s.skin=k;ws.pref=k;pushLobby(r);break}
    case 'arena':if(r&&!r.quick&&r.host===ws&&r.state=='lobby'&&Number.isInteger(m.arena)&&m.arena>=0&&m.arena<4){r.arena=m.arena;pushLobby(r)}break;

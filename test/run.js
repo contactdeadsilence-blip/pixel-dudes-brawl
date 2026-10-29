@@ -46,11 +46,25 @@ const wait=(f,ms,what)=>new Promise((res,rej)=>{const t0=Date.now(),h=setInterva
  await db.run("UPDATE users SET coins=coins+200 WHERE username='alice'");const before=(await api('me',null,A)).j.user.coins;
  r=await api('shop/buy',{skin:4},A);assert.equal(r.status,200);assert(r.j.user.unlocked.includes(4));assert.equal(r.j.user.coins,before-PDBP[4]);
  r=await api('shop/buy',{skin:4},A);assert.equal(r.status,409);console.log('skin purchase OK, coins',before,'->',before-PDBP[4]);
+// --- cosmetics: validation, buy, equip
+ const CB=require('../shared/core.js').COS_BY;
+ r=await api('shop/item',{item:'nope'},A);assert.equal(r.status,400,'unknown item');
+ r=await api('shop/item',{item:'hat_halo'},A);assert.equal(r.status,402,'unaffordable item');
+ r=await api('shop/item',{item:'hat_cap'},G);assert.equal(r.status,402,'guest broke');
+ await db.run("UPDATE users SET coins=coins+500 WHERE username='alice'");const cb=(await api('me',null,A)).j.user.coins;
+ r=await api('shop/item',{item:'hat_crown'},A);assert.equal(r.status,200);assert(r.j.user.cosm.own.includes('hat_crown'));assert.equal(r.j.user.cosm.eq.hat,'hat_crown');assert.equal(r.j.user.coins,cb-CB.hat_crown.p);
+ r=await api('shop/item',{item:'hat_crown'},A);assert.equal(r.status,409,'double buy');
+ r=await api('shop/equip',{cat:'hat',item:'hat_top'},A);assert.equal(r.status,403,'equip unowned');
+ r=await api('shop/equip',{cat:'trail',item:'hat_crown'},A);assert.equal(r.status,400,'wrong category');
+ r=await api('shop/equip',{cat:'hat',item:null},A);assert.equal(r.status,200);assert(!r.j.user.cosm.eq.hat);
+ r=await api('shop/equip',{cat:'hat',item:'hat_crown'},A);assert.equal(r.status,200);assert.equal(r.j.user.cosm.eq.hat,'hat_crown');
+ const pr=await db.get("SELECT item,price FROM purchases WHERE item='hat_crown'");assert.equal(pr.price,CB.hat_crown.p);
+ console.log('cosmetics buy/equip/reject OK, coins',cb,'->',r.j.user.coins);
  // --- private room with code + CPU, then disconnect mid-match -> CPU takeover
  c1.end=c2.end=null;c1.start=c2.start=null;c1.send({t:'leave'});c2.send({t:'leave'});c1.send({t:'create'});await wait(()=>c1.lobby&&!c1.lobby.quick,2000,'private room');
  const code=c1.lobby.code;assert(/^[A-Z]{4}$/.test(code));c2.send({t:'join',code});await wait(()=>c2.lobby&&c2.lobby.code==code,2000,'join');
  c1.send({t:'addcpu'});c2.send({t:'start'});c1.send({t:'start'});await wait(()=>c1.start&&c2.start,3000,'private start');
- assert.equal(c1.start.slots.filter(Boolean).length,3);console.log('private room',code,'with CPU started');
+ assert.equal(c1.start.slots.filter(Boolean).length,3);assert.equal(c1.start.slots[c1.you].cos.hat,'hat_crown','cosmetics synced in start');assert.equal(c1.lobby.slots[c1.you].cos.hat,'hat_crown','cosmetics in lobby');console.log('private room',code,'with CPU started');
  await new Promise(r=>setTimeout(r,2000));clearInterval(c2.bot);c2.ws.close();await new Promise(r=>setTimeout(r,500));
  const fl=c1.last.F[1][7];assert(fl&4,'disconnected player became CPU');console.log('disconnect -> CPU takeover OK');
  await wait(()=>c1.end,30000,'private end');console.log('private match ended, winner',c1.end.winner);

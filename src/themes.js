@@ -51,7 +51,18 @@ const THEMES=[
    sprP(D16([".o..o...","o.oo.o..",".oKKo...","o.oo.o..",".o..o..."].map(r=>r+"........")),{K:'#b08040'})],
   bg:()=>{bands([['#e8603a',0],['#f07a3a',55],['#f59a4a',105],['#f8b85e',150],['#fbd27a',185]]);disc(Math.round(W*.3),Math.round(H*.62),34,'#fff0a0','#ffd060');
    mesas(.2,64,'#b8603e','#d07a4e',2);mesas(.45,34,'#8a3e2e','#a8523a',6)},thumb:'#f07a3a'}];
-const thOfMap=m=>{const i=ARENAS.findIndex(a=>a.map===m);return i<0?0:i};
+// Store arena themes (cosmetic palette variants of existing arenas; same maps/physics)
+THEMES.push(
+ {name:'NIGHT MEADOW',top:sprP(GR,{G:'#3a7a5a',g:'#2c5e48',d:'#4a3a5a',D:'#3a2c48',e:'#54446a'}),fill:sprP(GR.slice(6).concat(GR.slice(6,12)),{D:'#3a2c48',d:'#2c2238',e:'#54446a'}),
+  brick:sprP(BR,{h:'#8a8ab8',R:'#5a5a8a',r:'#3a3a62'}),plank:sprP(PLR,{e:'#7a6a8a',D:'#54486a',d:'#3a304a'}),spike:sprP(SPK,{S:'#c8d0e8',s:'#7880a8',k:'#2a2a48'}),decor:THEMES[0].decor,
+  bg:()=>{bands([['#0c1030',0],['#141a44',60],['#1e2656',120],['#283266',170]]);stars(120,5,'#ffffff',H*.6);disc(70,44,14,'#f4efd2','#c9c2a0');
+   peaks(.2,60,50,'#1c3a3a','#24504a',2);peaks(.45,30,40,'#12282a','#1c3a3a',4);stars(30,9,'#d8f070',H)},thumb:'#141a44'},
+ {name:'VOLCANO TOWERS',top:sprP(STONETOP,{G:'#f99252',g:'#c8483a',D:'#4a2a2a',d:'#2e1a1e',e:'#6a3a30'}),fill:sprP(STONE,{D:'#4a2a2a',d:'#2e1a1e',e:'#6a3a30'}),
+  brick:sprP(BR,{h:'#f99252',R:'#b8402e',r:'#6e2420'}),plank:sprP(PLR,{e:'#8a5a48',D:'#5a3a30',d:'#3a2420'}),spike:sprP(SPK,{S:'#ffd27a',s:'#e0603a',k:'#3a1a1a'}),decor:THEMES[1].decor,
+  bg:()=>{bands([['#1a0a0e',0],['#2e1016',50],['#4a1a1a',105],['#6e2a1e',150],['#a8401e',195]]);stars(60,4,'#f99252',H);disc(W-80,60,22,'#ffb050','#e0603a');
+   peaks(.2,70,90,'#2a1418','#e0603a',1);castles(.45,40,'#1a0c10','#2e1418',5)},thumb:'#6e2a1e'});
+const thSub=i=>{try{const id=typeof PVTH!='undefined'&&PVTH!=null?PVTH:(['ofight','oresult'].includes(state)?NET.th:(ACC.user&&ACC.user.cosm&&ACC.user.cosm.eq.arena));const it=id&&PDBCore.COS_BY[id];return it&&it.base===i?it.th:i}catch(e){return i}};
+const thOfMap=m=>{const i=ARENAS.findIndex(a=>a.map===m);return thSub(i<0?0:i)};
 function drawTile(c,px,py,x,y){const S=(xx,yy)=>{const r=map[yy];return r&&solidCh(r[xx]||' ')},Th=THEMES[thOfMap(map)];
  if(c=='#'){const top=y==0||!S(x,y-1);ctx.drawImage(top?Th.top:Th.fill,px,py);edge(px,py,x>0&&!S(x-1,y),!S(x+1,y),y<map.length-1&&!S(x,y+1));
   if(top&&(y==0||map[y-1][x]==' ')){const hh=(x*7349+y*131)%11;if(hh<3)ctx.drawImage(Th.decor[hh],px,py-T)}}

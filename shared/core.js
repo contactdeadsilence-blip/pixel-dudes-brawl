@@ -11,6 +11,21 @@ const CHALLENGES=[{id:'play3',txt:'PLAY 3 MATCHES',n:3,r:40,k:'play'},{id:'kos10
 function chalAdd(c,e){switch(c.k){case 'play':return 1;case 'kos':return e.kos|0;case 'win':return e.won?1:0;case 'online':return e.online?1:0;case 'owin':return e.online&&e.won?1:0;
  case 'kos3':return (e.kos|0)>=3?1:0;case 'flaw':return e.flawless?1:0;case 'four':return e.players>=4?1:0;case 'mode':return e.mode==c.m?1:0;case 'modewin':return e.mode==c.m&&e.won?1:0}return 0}
 const ITEM_KINDS=['bomb','speed','shield','heal','hammer'],ITEM_INT=[0,900,540,300],ITEM_NAMES=['OFF','LOW','MEDIUM','HIGH'];
+// Cosmetics: purely visual, bought with coins and validated by the server. th = THEMES index the arena theme swaps in for arena `base`.
+const COSMETICS=[
+ {id:'hat_cap',cat:'hat',n:'BALL CAP',p:150},{id:'hat_band',cat:'hat',n:'HEADBAND',p:150},{id:'hat_viking',cat:'hat',n:'VIKING HELM',p:250},{id:'hat_top',cat:'hat',n:'TOP HAT',p:300},
+ {id:'hat_wizard',cat:'hat',n:'WIZARD HAT',p:350},{id:'hat_crown',cat:'hat',n:'CROWN',p:500},{id:'hat_halo',cat:'hat',n:'HALO',p:600},
+ {id:'tr_fire',cat:'trail',n:'FIRE TRAIL',p:200},{id:'tr_ice',cat:'trail',n:'ICE TRAIL',p:200},{id:'tr_spark',cat:'trail',n:'SPARKLE TRAIL',p:300},{id:'tr_rainbow',cat:'trail',n:'RAINBOW TRAIL',p:500},
+ {id:'ko_confetti',cat:'ko',n:'CONFETTI KO',p:250},{id:'ko_bolt',cat:'ko',n:'LIGHTNING KO',p:350},{id:'ko_boom',cat:'ko',n:'PIXEL BOOM KO',p:500},
+ {id:'po_jump',cat:'pose',n:'VICTORY HOP',p:200},{id:'po_spin',cat:'pose',n:'SPIN',p:250},{id:'po_dance',cat:'pose',n:'DANCE',p:300},{id:'po_trophy',cat:'pose',n:'TROPHY RAISE',p:400},
+ {id:'nc_gold',cat:'name',n:'GOLD NAME',p:100,c:'#fee761'},{id:'nc_mint',cat:'name',n:'MINT NAME',p:100,c:'#7fe0d0'},{id:'nc_pink',cat:'name',n:'PINK NAME',p:150,c:'#ff8ad0'},
+ {id:'nc_sky',cat:'name',n:'SKY NAME',p:150,c:'#8fb8ff'},{id:'nc_fire',cat:'name',n:'FIRE NAME',p:200,c:'#f99252'},{id:'nc_rainbow',cat:'name',n:'RAINBOW NAME',p:300,c:'rainbow'},
+ {id:'ar_night',cat:'arena',n:'NIGHT MEADOW',p:400,base:0,th:4},{id:'ar_volcano',cat:'arena',n:'VOLCANO TOWERS',p:700,base:1,th:5}];
+const COS_CATS=['hat','trail','ko','pose','name','arena'];
+const COS_BY=Object.fromEntries(COSMETICS.map(c=>[c.id,c]));
+// parse a stored cosm JSON into {own:[ids],eq:{cat:id}}, dropping anything unknown or not owned
+function cosParse(j){let o;try{o=typeof j=='string'?JSON.parse(j||'{}'):(j||{})}catch(e){o={}}const own=Array.isArray(o.own)?o.own.filter(id=>COS_BY[id]):[];const eq={};
+ if(o.eq&&typeof o.eq=='object')for(const c of COS_CATS){const id=o.eq[c];if(id&&COS_BY[id]&&COS_BY[id].cat==c&&own.includes(id))eq[c]=id}return {own,eq}}
 function tierOf(r){let t=TIERS[0];for(const x of TIERS)if(r>=x[1])t=x;return t[0]}
 function createCore(H){H=H||{};
 const W=480,T=16;const PCOL=['#e04848','#4a8fe0','#fee761','#a1e55a'];
@@ -149,6 +164,6 @@ function unsnap(a,f){f.x=a[0]/10;f.y=a[1]/10;f.vx=a[2]/10;f.vy=a[3]/10;f.face=a[
 return{ARENAS,T,PCOL,startFight,step,hitbox,onGround,snap,unsnap,snapX,unsnapX,rank,ITEM_KINDS,get items(){return IT},get hill(){return HILL},get coins(){return CO},get hillT(){return hillT},score,MODES,KOTH_GOAL,COIN_GOAL,get projs(){return PR},
  get F(){return F},get map(){return map},get arena(){return arena},get WW(){return WW},get WH(){return WH},get readyT(){return readyT},get endT(){return endT},get winner(){return winner},get hitstop(){return hitstop},get timer(){return timer},get tick(){return tick},get opts(){return opts},
  setCPU(i,v){const f=F.find(f=>f.i==i);if(f)f.cpu=v}}}
-const api={createCore,PRICES,STARTER,TIERS,tierOf,CHALLENGES,chalAdd,ITEM_KINDS,ITEM_NAMES,MODES};
+const api={createCore,PRICES,STARTER,TIERS,tierOf,CHALLENGES,chalAdd,ITEM_KINDS,ITEM_NAMES,MODES,COSMETICS,COS_CATS,COS_BY,cosParse};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.PDBCore=api;
 })(typeof window!=='undefined'?window:globalThis);

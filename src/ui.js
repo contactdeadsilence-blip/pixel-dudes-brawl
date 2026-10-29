@@ -127,9 +127,9 @@ function netOpen(first){if(NET.ws&&NET.ws.readyState<=1){if(NET.ws.readyState==1
 function netClose(){if(NET.ws){const w=NET.ws;NET.ws=null;try{w.close()}catch(e){}}NET.lobby=null}
 function netLeave(){netSend({t:'leave'});NET.lobby=null;state='online';opause=false}
 function netMsg(m){if(m.t=='lobby'){NET.lobby=m;if(state=='online'||state=='joincode')state='lobby'}
- else if(m.t=='start'){NET.you=m.you;NET.names=m.slots.map(s=>s?s.name:'');CORE.startFight(m.slots,m.arena,{stocks:m.stocks,mode:m.mode||'stock',time:m.time||0,items:m.items|0,ff:!!m.ff});syncCore();arena=m.arena;parts=[];NET.snaps=[];NET.rt=-1;NET.lt=0;NET.own=false;NET.X=null;NET.tm=0;NET.lb=-1;NET.res=null;opause=false;state='ofight';camUpdate(true)}
+ else if(m.t=='start'){NET.you=m.you;NET.names=m.slots.map(s=>s?s.name:'');NET.slots=m.slots;NET.cos=m.slots.map(s=>s&&s.cos||{});NET.th=m.th||null;CORE.startFight(m.slots,m.arena,{stocks:m.stocks,mode:m.mode||'stock',time:m.time||0,items:m.items|0,ff:!!m.ff});syncCore();arena=m.arena;parts=[];NET.snaps=[];NET.rt=-1;NET.lt=0;NET.own=false;NET.X=null;NET.tm=0;NET.lb=-1;NET.res=null;opause=false;state='ofight';camUpdate(true)}
  else if(m.t=='snap'){if(state!='ofight'&&!(state=='settings'&&ST.back=='ofight'))return;m.arr=performance.now();if(m.X)NET.X=m.X;if(m.timer!=null)NET.tm=m.timer;m.X=NET.X;m.timer=NET.tm;m.readyT=m.readyT|0;m.endT=m.endT|0;NET.snaps.push(m);if(NET.snaps.length>40)NET.snaps.shift();
-  for(const e of m.ev||[]){if(e[0]=='s'){SFX[e[1]]&&SFX[e[1]](e[2])}else if(e[0]=='k')addShake(e[1]);else if(e[0]=='b')burst(e[1],e[2],e[3],e[4],e[5]);else if(e[0]=='o')koFx(e[2],e[3],e[1]);else if(e[0]=='p')partFx(e[1],e[2])}}
+  for(const e of m.ev||[]){if(e[0]=='s'){SFX[e[1]]&&SFX[e[1]](e[2])}else if(e[0]=='k')addShake(e[1]);else if(e[0]=='b')burst(e[1],e[2],e[3],e[4],e[5]);else if(e[0]=='o')koFx(e[2],e[3],e[1],e[4]);else if(e[0]=='p')partFx(e[1],e[2])}}
  else if(m.t=='end'){NET.res=m;chalToast(m.chal);if(ACC.user&&m.coins!=null)ACC.user.coins=m.coins;const r=m.rank.find(r=>r.i==NET.you);if(r&&r.coins)setTimeout(()=>SFX.coin(),900);if(state=='settings')state='oresult';else state='oresult';opause=false}
  else if(m.t=='user'){ACC.user=m.user}
  else if(m.t=='err'){toast(m.m);SFX.err();if(m.fatal&&state=='lobby')state='online'}}
@@ -178,25 +178,13 @@ function drawLobby(){const L=NET.lobby;if(!L){text(NET.ws&&NET.ws.readyState==1?
  text(L.quick?'QUICK MATCH':'PRIVATE ROOM',W/2,26,PAL.Y,32,'center');if(!L.quick){panel(W/2-60,32,120,22);text('CODE: '+L.code,W/2,48,'#ffffff',16,'center')}acctBadge(4,4);
  for(let i=0;i<4;i++){const s=L.slots[i],x=8+i*118,y=60;panel(x,y,110,116,i==L.you?'#5d4a6e':'#2b2b40');ctx.fillStyle=PCOL[i];ctx.fillRect(x+1,y+1,108,3);
   if(!s){text(L.quick?'SEARCHING':'EMPTY',x+55,y+60,'#8b93a6',16,'center');continue}
-  text(s.name.slice(0,12),x+55,y+20,PCOL[i],s.name.length>6?8:16,'center');drawSheet(imgs[s.skin],x+39,y+28,1,2,Math.floor(t/7)%4,2);text(NAMES[s.skin],x+55,y+90,PAL.Y,16,'center');
+  text(s.name.slice(0,12),x+55,y+20,nameCol(s.cos,PCOL[i]),s.name.length>6?8:16,'center');drawSheet(imgs[s.skin],x+39,y+28,1,2,Math.floor(t/7)%4,2);text(NAMES[s.skin],x+55,y+90,PAL.Y,16,'center');
   text(s.type=='cpu'?'CPU':i==L.you?'YOU':s.host?'HOST':'PLAYER',x+55,y+106,'#d8dde6',8,'center')}
  const A=ARENAS[L.arena];text(L.quick?'ARENA: RANDOM':'ARENA: \u2190 '+A.name+' \u2192',W/2,188,'#ffffff',16,'center');text(rulesLine(L.quick?'stock':L.mode,L.quick?2:L.items,L.ff),W/2,201,'#ffffff',8,'center');
  let st=L.count>=0?'STARTING IN '+L.count:L.quick?(L.fill>=0?'WAITING FOR PLAYERS... CPU FILL IN '+L.fill:'WAITING FOR PLAYERS...'):L.host?'START WHEN READY (2+ FIGHTERS)':'WAITING FOR HOST TO START';text(st,W/2,216,L.count>=0?PAL.Y:'#d8dde6',st.length>30?8:16,'center');
  if(L.host&&!L.quick){bar([[['LB','RB'],'ARENA'],[['UP'],'MODE'],[['DN'],'ITEMS'],...(L.mode=='teams'?[[['BK'],'FF']]:[]),[['Y','X'],'CPU'],[['A'],'START']],[[['Q','E'],'ARENA'],[['M'],'MODE'],[['I'],'ITEMS'],...(L.mode=='teams'?[[['F'],'FF']]:[]),[['C','BKSP'],'CPU'],[['ENTER'],'START']],242)}
  else bar([[['DP'],'SKIN'],[['B'],'LEAVE']],[[['\u2190','\u2192'],'SKIN'],[['ESC'],'LEAVE']],242)}
-// ===== Shop =====
-const SH={sel:4,back:'menu',busy:false};
-function updShop(){let c=SH.sel%GC,r=Math.floor(SH.sel/GC);const R=Math.ceil(NS/GC);if(mL()){c=(c+GC-1)%GC;SFX.sel()}if(mR()){c=(c+1)%GC;SFX.sel()}if(mU()){r=(r+R-1)%R;SFX.sel()}if(mD()){r=(r+1)%R;SFX.sel()}SH.sel=Math.min(NS-1,r*GC+c);
- if(mBack()){state=SH.back=='online'?'online':'menu';SFX.back();return}
- if(KP.KeyC||anyPad(i=>padEdge(i,'Y'))){api('coins/checkout',{pack:'small'}).then(()=>toast('OK')).catch(e=>{toast(e.message);SFX.err()})}
- if(mOK()&&!SH.busy){const n=SH.sel;if(owned(n)){toast('ALREADY UNLOCKED');SFX.sel();return}if(ACC.user.coins<PRICES[n]){toast('NOT ENOUGH COINS');SFX.err();return}
-  SH.busy=true;api('shop/buy',{skin:n}).then(j=>{SH.busy=false;ACC.user=j.user;SFX.unlock();setTimeout(()=>SFX.coin(),350);toast(NAMES[n]+' UNLOCKED!');burst(W/2,120,'#fee761',30,3)}).catch(e=>{SH.busy=false;toast(e.message);SFX.err()})}}
-function drawShop(){text('SKIN SHOP',W/2,24,PAL.Y,32,'center');acctBadge(W-4,4,'right');const gx=Math.round((W-GC*30)/2),gy=32;
- for(let n=0;n<NS;n++){const x=gx+(n%GC)*30,y=gy+Math.floor(n/GC)*33;panel(x,y,28,31,n==SH.sel?'#5d4a6e':'#2b2b40');ctx.drawImage(imgs[n],0,0,FW,FH,x+6,y+4,FW,FH);if(!owned(n))lockIcon(x,y,PRICES[n]);
-  if(n==SH.sel){ctx.fillStyle=PAL.Y;ctx.fillRect(x-1,y-1,30,2);ctx.fillRect(x-1,y+30,30,2);ctx.fillRect(x-1,y-1,2,33);ctx.fillRect(x+27,y-1,2,33)}}
- const n=SH.sel;panel(60,136,360,74);drawSheet(imgs[n],76,140,1,2,Math.floor(t/7)%4,3);text(NAMES[n],140,160,PAL.Y,24);
- if(owned(n))text('UNLOCKED',140,184,'#a1e55a',16);else{coinIcon(140,175);text(String(PRICES[n]),152,184,'#fee761',16);text(ACC.user&&ACC.user.coins>=PRICES[n]?'PRESS A / ENTER TO BUY':'EARN COINS: PLAY ONLINE OR VS CPU WHILE LOGGED IN',140,200,'#d8dde6',8)}
- bar([[['DP'],'BROWSE'],[['A'],'BUY'],[['Y'],'BUY COINS'],[['B'],'BACK']],[[['\u2190','\u2192'],'BROWSE'],[['ENTER'],'BUY'],[['C'],'BUY COINS'],[['ESC'],'BACK']],242)}
+// ===== Shop: see src/cosm.js =====
 // ===== UI dispatch =====
 const UIS=new Set(['menu','settings','login','online','joincode','lobby','shop']);
 function drawUI(){if(state=='menu')drawMenu();else if(state=='settings')drawSettings();else if(state=='login')drawLogin();else if(state=='online')drawOnlineMenu();else if(state=='joincode')drawJoin();else if(state=='lobby')drawLobby();else if(state=='shop')drawShop()}
