@@ -19,7 +19,7 @@ st=rng(59,63)
 st=st.replace("let shakeMode=+(localStorage.getItem('pdbShake')||0),showFPS=false;const SHAKE_NAMES","const SHAKE_NAMES").replace("v*SHAKE_K[shakeMode]","v*SHAKE_K[SET.shake]").replace("function setShake(m){shakeMode=m;try{localStorage.setItem('pdbShake',m)}catch(e){}}","function setShake(m){SET.shake=m;saveSet()}")
 st=st.replace("let state='select'","let state='title'")
 assert 'shakeMode' not in st
-sf="""function startFight(){CORE.startFight(slots.map(s=>({type:s.type,skin:s.skin})),arena,{stocks:SET.stocks,diff:SET.diff,time:SET.timer*3600});syncCore();parts=[];state='fight';camUpdate(true)}
+sf="""function startFight(){CORE.startFight(slots.map(s=>({type:s.type,skin:s.skin})),arena,{stocks:SET.stocks,diff:SET.diff,time:SET.timer*3600,items:SET.items});syncCore();parts=[];state='fight';camUpdate(true)}
 """+L[67]  # burst / PMAX line 68
 rest=rng(112,237)
 def pat(a):
@@ -68,6 +68,7 @@ R1("[[KC('ENTER')],n>=2?'FIGHT!':'NEED 2+ PLAYERS']],W/2,254)}}\n","[[KC('ENTER'
 R1("ctx.drawImage(imgs[n],0,0,FW,FH,x+6,y+4,FW,FH)}","ctx.drawImage(imgs[n],0,0,FW,FH,x+6,y+4,FW,FH);if(!owned(n))lockIcon(x,y,PRICES[n])}")
 R1("text(NAMES[s.skin],x+72,y+50,PAL.Y,16,'center');","text(NAMES[s.skin],x+72,y+50,PAL.Y,16,'center');if(s.type=='human'&&!owned(s.skin))text('LOCKED',x+72,y+62,'#f99252',8,'center');")
 R1("  else if(state=='arena'){text(","  else if(state=='arena')safe(()=>{text(")
+R1("ctx.drawImage(mapCanvas(),0,-T);F.forEach(f=>drawF(f,0));","ctx.drawImage(mapCanvas(),0,-T);drawItems();F.forEach(f=>drawF(f,0));drawBuffs();")
 R1("[[KC('ESC')],'BACK']],W/2,224)}\n  else{drawWorld();","[[KC('ESC')],'BACK']],W/2,224)})\n  else{drawWorld();")
 R1("ctx.restore();ctx.save();drawIndicators();drawHUD();","ctx.restore();ctx.save();drawIndicators();drawHUD();const tm=state=='ofight'||state=='oresult'?NET.timer:CORE.timer;if(tm>0&&(state!='fight'||CORE.opts.time)){const s=Math.ceil(tm/60);panel(W/2-26,2,52,18);text(Math.floor(s/60)+':'+String(s%60).padStart(2,'0'),W/2,16,s<=10?'#e04848':'#ffffff',16,'center')}\n   safe(()=>{")
 R1("if(endT)text('GAME!',W/2,110,PAL.Y,48,'center');","if(endT)text(tm==0&&(CORE.opts.time||state!='fight')&&!(F.filter(f=>!f.out).length<=1)?'TIME!':'GAME!',W/2,110,PAL.Y,48,'center');")

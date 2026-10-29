@@ -43,3 +43,16 @@ function drawChal(){text('DAILY CHALLENGES',W/2,30,PAL.Y,32,'center');acctBadge(
  text('PROGRESS COUNTS IN ONLINE MATCHES AND LOCAL MATCHES WHILE LOGGED IN',W/2,222,'#d8dde6',8,'center');bar([[['B'],'BACK']],[[['ESC'],'BACK']])}
 const _drawUIy=drawUI;drawUI=function(){if(state=='chal')drawChal();else _drawUIy()};
 const _updUIy=updUI;updUI=function(){if(state=='chal')updChal();else _updUIy()};
+// ===== Items (sim lives in shared core; this only draws them) =====
+const ITEM_ART={bomb:['..oo..','.o##o.','o####o','o##.#o','o####o','.oooo.'],speed:['..yy..','.yyy..','yyyyyy','..yyy.','..yy..','.y....'],
+ shield:['.cccc.','cwwwwc','cwccwc','cwccwc','.cwwc.','..cc..'],heal:['..gg..','..gg..','gggggg','gggggg','..gg..','..gg..'],hammer:['oooooo','o####o','oooooo','..ww..','..ww..','..ww..']};
+const ITEM_PAL={o:'#3b2c2e','#':'#5a5a6e',y:'#fee761',c:'#7fe0d0',w:'#ffffff',g:'#a1e55a','.':null};
+function itemSprite(k){return cacheCanvas('item_'+k,8,8,()=>{ITEM_ART[k].forEach((row,y)=>[...row].forEach((ch,x)=>{const c=ITEM_PAL[ch];if(c){ctx.fillStyle=c;ctx.fillRect(x+1,y+1,1,1)}}))})}
+function drawItems(){for(const it of CORE.items){if(it.life<120&&Math.floor(t/4)%2)continue;const k=PDBCore.ITEM_KINDS[it.k],bob=Math.round(Math.sin(t/12+it.x)*1);
+  const ix=Math.round(it.x)-3,iy=Math.round(it.y)-5+bob;ctx.fillStyle=PAL.o;ctx.fillRect(ix-1,iy-1,18,18);ctx.fillStyle=t%40<20?'#fee761':'#ffffff';ctx.fillRect(ix,iy,16,16);ctx.fillStyle='#262b44';ctx.fillRect(ix+1,iy+1,14,14);ctx.drawImage(itemSprite(k),ix,iy,16,16)}
+ for(const p of CORE.projs){ctx.drawImage(itemSprite('bomb'),Math.round(p.x)-4,Math.round(p.y)-4,8,8);if(t%4<2){ctx.fillStyle='#fee761';ctx.fillRect(Math.round(p.x)+1,Math.round(p.y)-5,1,1)}}}
+function drawBuffs(){for(const f of F){if(f.out||f.respawn>0||!f.buf)continue;const B=f.buf,x=Math.round(f.x),y=Math.round(f.y);
+  if(B.sh){ctx.globalAlpha=.35+.15*Math.sin(t/5);ctx.fillStyle='#7fe0d0';ctx.fillRect(x-3,y-3,16,26);ctx.globalAlpha=1;ctx.fillStyle='#7fe0d0';ctx.fillRect(x-3,y-3,16,1);ctx.fillRect(x-3,y+22,16,1);ctx.fillRect(x-3,y-3,1,26);ctx.fillRect(x+12,y-3,1,26)}
+  if(B.spd&&t%3==0)parts.length<PMAX&&parts.push({x:f.x+5-f.face*5,y:f.y+16,vx:-f.face*.5,vy:0,l:10,c:'#fee761'});
+  if(B.ham){const hx=f.face>0?x+9:x-7;ctx.fillStyle=PAL.o;ctx.fillRect(hx,y+2,8,6);ctx.fillStyle='#8b93a6';ctx.fillRect(hx+1,y+3,6,4);ctx.fillStyle='#c77b3f';ctx.fillRect(hx+3,y+8,2,6)}
+  if(B.bomb)ctx.drawImage(itemSprite('bomb'),x+1,y-20,8,8)}}
