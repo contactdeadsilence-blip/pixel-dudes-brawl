@@ -11,13 +11,14 @@ const db=new Database(DB_PATH);db.pragma('journal_mode = WAL');
 db.exec(`CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,username TEXT UNIQUE COLLATE NOCASE,pass TEXT,coins INTEGER DEFAULT 0,unlocked TEXT,settings TEXT DEFAULT '{}',guest INTEGER DEFAULT 0,created INTEGER);
 CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,user_id INTEGER,created INTEGER);
 CREATE TABLE IF NOT EXISTS purchases(id INTEGER PRIMARY KEY,user_id INTEGER,skin INTEGER,price INTEGER,ts INTEGER);`);
+for(const c of ['rating INTEGER DEFAULT 1000','games INTEGER DEFAULT 0','wins INTEGER DEFAULT 0'])try{db.exec('ALTER TABLE users ADD COLUMN '+c)}catch(e){}
 const q={byName:db.prepare('SELECT * FROM users WHERE username=?'),byId:db.prepare('SELECT * FROM users WHERE id=?'),
  ins:db.prepare('INSERT INTO users(username,pass,coins,unlocked,guest,created) VALUES(?,?,0,?,?,?)'),
  sess:db.prepare('INSERT INTO sessions VALUES(?,?,?)'),tok:db.prepare('SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=?'),
  delTok:db.prepare('DELETE FROM sessions WHERE token=?'),setS:db.prepare('UPDATE users SET settings=? WHERE id=?'),
  coins:db.prepare('UPDATE users SET coins=coins+? WHERE id=?'),buy:db.prepare('UPDATE users SET coins=coins-?,unlocked=? WHERE id=? AND coins>=?'),
  log:db.prepare('INSERT INTO purchases(user_id,skin,price,ts) VALUES(?,?,?,?)')};
-const pub=u=>({username:u.username,coins:u.coins,unlocked:JSON.parse(u.unlocked||'[]'),settings:JSON.parse(u.settings||'{}'),guest:!!u.guest});
+const pub=u=>({username:u.username,coins:u.coins,rating:u.rating,games:u.games,wins:u.wins,tier:PDB.tierOf(u.rating),unlocked:JSON.parse(u.unlocked||'[]'),settings:JSON.parse(u.settings||'{}'),guest:!!u.guest});
 const newSession=u=>{const t=crypto.randomBytes(24).toString('hex');q.sess.run(t,u.id,Date.now());return t};
 const SESS_MS=90*864e5,touchTok=db.prepare('UPDATE sessions SET created=? WHERE token=?'),ageTok=db.prepare('SELECT created FROM sessions WHERE token=?');
 db.prepare('DELETE FROM sessions WHERE created<?').run(Date.now()-SESS_MS);
@@ -67,6 +68,15 @@ app.post('/api/shop/buy',auth,(req,res)=>{const skin=req.body&&req.body.skin;
  if(!r.ok)return res.status(r.code).json({error:r.error});res.json({user:pub(q.byId.get(req.user.id))})});
 // Real-money coin packs are intentionally NOT implemented. Wire a payment provider here (e.g. Stripe Checkout + webhook that credits coins).
 app.post('/api/coins/checkout',auth,(req,res)=>res.status(501).json({error:'payments not configured'}));
+// ===== Ranked =====
+const rq={top:db.prepare('SELECT username,rating,games,wins FROM users WHERE guest=0 AND games>0 ORDER BY rating DESC,wins DESC LIMIT 50'),
+ pos:db.prepare('SELECT COUNT(*)+1 n FROM users WHERE guest=0 AND games>0 AND rating>?'),upd:db.prepare('UPDATE users SET rating=?,games=games+1,wins=wins+? WHERE id=?')};
+app.get('/api/leaderboard',(req,res)=>{const t=(req.get('authorization')||'').replace(/^Bearer /,''),u=userOf(t);
+ res.json({top:rq.top.all().map((r,k)=>Object.assign(r,{pos:k+1,tier:PDB.tierOf(r.rating)})),me:u&&!u.guest?{username:u.username,rating:u.rating,games:u.games,tier:PDB.tierOf(u.rating),pos:u.games?rq.pos.get(u.rating).n:null}:null})});
+// Elo across placements: every pair of ranked (non-guest) humans is a game; K scaled by field size
+function rateMatch(order){const P=order.filter(x=>x.uid&&!x.guest);const n=P.length;const out={};if(n<2)return out;const K=32/(n-1);
+ const R=P.map(x=>q.byId.get(x.uid).rating);P.forEach((a,i)=>{let d=0;P.forEach((b,j)=>{if(i==j)return;const e=1/(1+Math.pow(10,(R[j]-R[i])/400)),sc=a.place<b.place?1:a.place>b.place?0:.5;d+=K*(sc-e)});
+  const nr=Math.max(0,Math.round(R[i]+d));rq.upd.run(nr,a.won?1:0,a.uid);out[a.uid]={old:R[i],rating:nr,delta:nr-R[i],tier:PDB.tierOf(nr)}});return out}
 app.get('/healthz',(req,res)=>res.json({ok:true,rooms:rooms.size}));
 app.use(express.static(path.join(__dirname,'..','public')));
 
@@ -78,7 +88,7 @@ function newRoom(quick){const r={code:mkCode(),quick,slots:[null,null,null,null]
 const humans=r=>r.slots.filter(s=>s&&s.type=='human'&&s.ws);
 function lobbyMsg(r,ws){const you=r.slots.findIndex(s=>s&&s.ws===ws),now=Date.now();
  return {t:'lobby',code:r.code,quick:r.quick,host:r.host===ws,you,arena:r.arena,
-  slots:r.slots.map(s=>s?{type:s.type,name:s.name,skin:s.skin,host:s.ws&&s.ws===r.host}:null),
+  slots:r.slots.map(s=>{if(!s)return null;const u=s.uid&&s.ws?q.byId.get(s.uid):null;return {type:s.type,name:s.name,skin:s.skin,host:s.ws&&s.ws===r.host,tier:u&&!u.guest?PDB.tierOf(u.rating):null,rating:u&&!u.guest?u.rating:null}}),ranked:r.quick,
   count:r.countAt?Math.max(0,Math.ceil((r.countAt-now)/1000)):-1,fill:r.quick&&r.fillAt&&!r.countAt?Math.max(0,Math.ceil((r.fillAt-now)/1000)):-1}}
 const pushLobby=r=>{for(const s of humans(r))send(s.ws,lobbyMsg(r,s.ws))};
 function firstOwned(u,pref){const un=JSON.parse(u.unlocked);return un.includes(pref)?pref:un[0]}
@@ -106,6 +116,7 @@ function tickRoom(r){const c=r.core;let res;try{res=c.step(i=>{const s=r.slots[i
  if(res=='win')endMatch(r)}
 function endMatch(r){clearInterval(r.loop);r.loop=null;const c=r.core,w=c.winner;
  const all=c.rank(),rank=all.map(f=>{const s=r.slots[f.i];let coins=0,bd=null;if(s&&s.type=='human'&&s.uid){const place=all.indexOf(f),won=w&&w.i==f.i;bd={part:REWARD.part,ko:REWARD.ko*Math.min(s.kos,9),place:w?REWARD.place[place]||0:0};coins=grant(s.uid,'online',bd.part+bd.ko+bd.place);if(won)coins+=(bd.firstWin=onceToday(s.uid,'firstwin',REWARD.firstWin))}return {i:f.i,name:s?s.name:'?',skin:f.skin,kos:s?s.kos:0,coins,bd}});
+ if(r.quick){const rt=rateMatch(all.map((f,k)=>{const s=r.slots[f.i];return {uid:s&&s.type=='human'&&s.ws?s.uid:null,guest:s&&s.ws&&s.ws.user.guest,place:w?k:0,won:!!(w&&w.i==f.i)}}));rank.forEach(x=>{const s=r.slots[x.i];if(s&&s.uid&&rt[s.uid])x.rank=rt[s.uid]})}
  for(const s of humans(r)){const u=q.byId.get(s.uid);s.ws.user=u;send(s.ws,{t:'end',winner:w?w.i:null,rank,coins:u.coins});send(s.ws,{t:'user',user:pub(u)})}
  r.state='lobby';r.core=null;r.slots=r.slots.map(s=>!s||s.type!='human'||!s.ws?(r.quick||!s?null:s.type=='cpu'&&!s.uid?s:null):Object.assign(s,{kos:0,inp:{b:0,e:0}}));
  if(r.quick)r.fillAt=Date.now()+QUICK_FILL_MS;if(!humans(r).length)return destroy(r);pushLobby(r)}

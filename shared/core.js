@@ -2,6 +2,8 @@
 (function(root){
 const PRICES=[0,0,0,0,200,200,200,250,250,250,300,300,300,350,350,350,400,400,450,450,500];
 const STARTER=[0,1,2,3];
+const TIERS=[['BRONZE',0,'#c77b3f'],['SILVER',1100,'#c0c8d8'],['GOLD',1200,'#fee761'],['PLATINUM',1300,'#7fe0d0'],['DIAMOND',1400,'#8fb8ff']];
+function tierOf(r){let t=TIERS[0];for(const x of TIERS)if(r>=x[1])t=x;return t[0]}
 function createCore(H){H=H||{};
 const W=480,T=16;const PCOL=['#e04848','#4a8fe0','#fee761','#a1e55a'];
 const SFX=new Proxy({},{get:(_,k)=>a=>{H.sfx&&H.sfx(k,a)}});
@@ -81,6 +83,6 @@ function unsnap(a,f){f.x=a[0]/10;f.y=a[1]/10;f.vx=a[2]/10;f.vy=a[3]/10;f.face=a[
 return{ARENAS,T,PCOL,startFight,step,hitbox,onGround,snap,unsnap,rank,
  get F(){return F},get map(){return map},get arena(){return arena},get WW(){return WW},get WH(){return WH},get readyT(){return readyT},get endT(){return endT},get winner(){return winner},get hitstop(){return hitstop},get timer(){return timer},get tick(){return tick},get opts(){return opts},
  setCPU(i,v){const f=F.find(f=>f.i==i);if(f)f.cpu=v}}}
-const api={createCore,PRICES,STARTER};
+const api={createCore,PRICES,STARTER,TIERS,tierOf};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.PDBCore=api;
 })(typeof window!=='undefined'?window:globalThis);
