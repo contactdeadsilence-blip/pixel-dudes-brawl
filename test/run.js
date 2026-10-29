@@ -43,7 +43,7 @@ const wait=(f,ms,what)=>new Promise((res,rej)=>{const t0=Date.now(),h=setInterva
  const kos=c1.end.rank.reduce((a,x)=>a+x.kos,0);const meR=c1.end.rank.find(x=>x.i==c1.you);assert(meR.coins>=20);
  r=await api('me',null,A);assert.equal(r.j.user.coins,meR.coins,'coins persisted');console.log('KOs in match',kos,'alice earned',meR.coins);
  // --- buy a skin after topping up coins (simulates a few matches)
- db.prepare("UPDATE users SET coins=coins+200 WHERE username='alice'").run();const before=(await api('me',null,A)).j.user.coins;
+ await db.run("UPDATE users SET coins=coins+200 WHERE username='alice'");const before=(await api('me',null,A)).j.user.coins;
  r=await api('shop/buy',{skin:4},A);assert.equal(r.status,200);assert(r.j.user.unlocked.includes(4));assert.equal(r.j.user.coins,before-PDBP[4]);
  r=await api('shop/buy',{skin:4},A);assert.equal(r.status,409);console.log('skin purchase OK, coins',before,'->',before-PDBP[4]);
  // --- private room with code + CPU, then disconnect mid-match -> CPU takeover
