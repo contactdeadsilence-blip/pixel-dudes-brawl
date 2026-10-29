@@ -363,7 +363,7 @@ function update(){t++;pollPads();if(KP.F3){SET.fps=!SET.fps;saveSet()}if((state=
    if(s.type=='none'){if(KPany(i,'a')){s.type='human';s.dev='kb';SFX.sel()}continue}
    if(s.type=='human'){moveCursor(s,(KPany(i,'r')?1:0)-(KPany(i,'l')?1:0),(KPany(i,'d')?1:0)-(KPany(i,'u')?1:0));if(KPany(i,'s')){s.type='none';SFX.sel()}}}
   for(let pi=0;pi<4;pi++){if(!padsRaw[pi])continue;const si=slots.findIndex(s=>s.pad===pi);
-   if(si<0){if(padEdge(pi,'B')&&!slots.some(s=>s.type=='human')){state='menu';SFX.back();continue}if(padEdge(pi,'A')||padEdge(pi,'ST')){const k=slots.findIndex(s=>s.type=='none');if(k>=0){Object.assign(slots[k],{type:'human',pad:pi,dev:'pad'});toast('P'+(k+1)+' CONTROLLER CONNECTED');SFX.sel()}else toast('ALL SLOTS FULL')}continue}
+   if(si<0){if(padEdge(pi,'B')){state='menu';SFX.back();continue}if(padEdge(pi,'A')||padEdge(pi,'ST')){const k=slots.findIndex(s=>s.type=='none');if(k>=0){Object.assign(slots[k],{type:'human',pad:pi,dev:'pad'});toast('P'+(k+1)+' CONTROLLER CONNECTED');SFX.sel()}else toast('ALL SLOTS FULL')}continue}
    const s=slots[si];moveCursor(s,(padRep(pi,'r')?1:0)-(padRep(pi,'l')?1:0)+(padEdge(pi,'RB')?1:0)-(padEdge(pi,'LB')?1:0),(padRep(pi,'dn')?1:0)-(padRep(pi,'up')?1:0));
    if(padEdge(pi,'B')){s.type='none';s.pad=null;toast('P'+(si+1)+' LEFT');SFX.sel()}
    if(padEdge(pi,'Y'))addCPU();if(padEdge(pi,'X')||padEdge(pi,'BK'))delCPU();if(padEdge(pi,'ST'))goArena()}
@@ -374,8 +374,8 @@ function update(){t++;pollPads();if(KP.F3){SET.fps=!SET.fps;saveSet()}if((state=
   const r=CORE.step(i=>rawInput(i));syncCore();camUpdate(false);if(r=='win')state='win'}}
    else if(state=='pause'){pauseSel=listNav(4,pauseSel);
    if(KP.Escape||anyPad(i=>padEdge(i,'ST')||padEdge(i,'B'))){state='fight';SFX.back()}
-   else if(mOK()){SFX.ok();if(pauseSel==0)state='fight';else if(pauseSel==1){startFight();SFX.go()}else if(pauseSel==2)openSettings('pause');else state='select'}}
-else if(state=='win'){if(mOK()||mStart()){startFight();SFX.go()}else if(mBack()){state='select';SFX.back()}}
+   else if(mOK()){SFX.ok();if(pauseSel==0)state='fight';else if(pauseSel==1){startFight();SFX.go()}else if(pauseSel==2)openSettings('pause');else{state='menu';SFX.back()}}}
+else if(state=='win'){if(mOK()||mStart()){startFight();SFX.go()}else if(mBack()){state='menu';SFX.back()}}
   if(state!='pause'){for(const p of parts){p.x+=p.vx;p.y+=p.vy;p.vy+=.08;p.vx*=.96;p.l--}let w=0;for(let r=0;r<parts.length;r++)if(parts[r].l>0)parts[w++]=parts[r];parts.length=w;if(shake>0)shake*=.8;if(shake<.75)shake=0}
  endPads()}
 function KPany(i,k){return KEYMAP[i][k].some(c=>KP[c])}
@@ -437,8 +437,8 @@ function draw(){camX=0;ctx.setTransform(cv.width/W,0,0,cv.height/H,0,0);ctx.imag
    if(s.type!='cpu'){const ps=slotPS(s);if(s.type=='human'&&s.dev=='pad'){prompt([[[PB('DP')],'MOVE'],[[PB('A')],'JUMP']],x+55,y+72,'center',ps);prompt([[[PB('X')],'ATK'],[[PB('B')],'DASH']],x+55,y+86,'center',ps)}
     else{prompt([[[kcap(i,'u'),kcap(i,'l'),kcap(i,'d'),kcap(i,'r')],'MOVE']],x+55,y+72);prompt([[[kcap(i,'a')],'ATK'],[[kcap(i,'s')],'DASH']],x+55,y+86)}}}
   const n=nPlayers();panel(8,238,464,30);
-  if(lastDev=='pad'){prompt([[[PB('A')],'JOIN'],[[PB('B')],'LEAVE'],[[PB('Y')],'ADD CPU'],[[PB('X')],'DEL CPU']],W/2,241);prompt([[[PB('LB'),PB('RB')],'PICK'],[[PB('ST')],n>=2?'FIGHT!':'NEED 2+']],W/2,254)}
-  else{prompt([[[0,1,2,3].map(i=>kcap(i,'a')),'JOIN'],[[KC('C')],'ADD CPU'],[[KC('BKSP')],'DEL CPU']],W/2,241);prompt([[[KC('ENTER')],n>=2?'FIGHT!':'NEED 2+ PLAYERS']],W/2,254)}})
+  if(lastDev=='pad'){prompt([[[PB('A')],'JOIN'],[[PB('B')],'LEAVE'],[[PB('Y')],'ADD CPU'],[[PB('X')],'DEL CPU']],W/2,241);prompt([[[PB('LB'),PB('RB')],'PICK'],[[PB('ST')],n>=2?'FIGHT!':'NEED 2+'],[[PB('B')],'MENU']],W/2,254)}
+  else{prompt([[[0,1,2,3].map(i=>kcap(i,'a')),'JOIN'],[[KC('C')],'ADD CPU'],[[KC('BKSP')],'DEL CPU'],[[KC('ESC')],'MENU']],W/2,241);prompt([[[KC('ENTER')],n>=2?'FIGHT!':'NEED 2+ PLAYERS']],W/2,254)}})
  else if(state=='arena')safe(()=>{text('CHOOSE ARENA',W/2,34,PAL.Y,32,'center');ARENAS.forEach((a,i)=>{const x=10+i*117,y=74,pw=108,ph=Math.round(108*a.map.length/a.map[0].length);if(i==arena){ctx.fillStyle=PAL.Y;ctx.fillRect(x-3,y-3,pw+6,ph+6)}ctx.fillStyle=PAL.o;ctx.fillRect(x-1,y-1,pw+2,ph+2);ctx.drawImage(arenaPrev[i],x,y,pw,ph);text(a.name,x+pw/2,y+82,i==arena?PAL.Y:'#ffffff',16,'center');text(a.map[0].length+'X'+a.map.length,x+pw/2,y+94,'#d8dde6',8,'center')});
   panel(40,214,400,30);if(lastDev=='pad')prompt([[[PB('DP')],'CHOOSE'],[[PB('A')],'FIGHT'],[[PB('B')],'BACK']],W/2,224);else prompt([[[KC('\u2190'),KC('\u2192')],'CHOOSE'],[[KC('ENTER')],'FIGHT'],[[KC('ESC')],'BACK']],W/2,224)})
   else{drawWorld();
@@ -645,6 +645,19 @@ function drawShop(){text('SKIN SHOP',W/2,24,PAL.Y,32,'center');acctBadge(W-4,4,'
 const UIS=new Set(['menu','settings','login','online','joincode','lobby','shop']);
 function drawUI(){if(state=='menu')drawMenu();else if(state=='settings')drawSettings();else if(state=='login')drawLogin();else if(state=='online')drawOnlineMenu();else if(state=='joincode')drawJoin();else if(state=='lobby')drawLobby();else if(state=='shop')drawShop()}
 function updUI(){if(state=='menu')updMenu();else if(state=='settings')updSettings();else if(state=='login')updLogin();else if(state=='online')updOnlineMenu();else if(state=='joincode')updJoin();else if(state=='lobby')updLobby();else if(state=='ofight')updOFight();else if(state=='oresult'){interp();updResult()}else if(state=='shop')updShop()}
+// ===== Mouse / touch BACK button (every screen except title & main menu) =====
+const BACKBTN={x:4,y:4,w:58,h:18};let backClick=false;
+function backBtnShown(){return !['title','menu'].includes(state)&&!(state=='ofight'&&!opause)&&!ST.wait&&!CAPTURE}
+function backLabel(){return state=='fight'?'PAUSE':(state=='pause'||state=='win'||state=='select')?'MENU':'BACK'}
+cv.addEventListener('pointerdown',e=>{if(!backBtnShown())return;const r=cv.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;
+ const b=BACKBTN;if(x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h){backClick=true;e.preventDefault()}});
+function doBackClick(){backClick=false;if(!backBtnShown())return;
+ if(state=='pause'||state=='win'||state=='select'){state='menu';SFX.back();return}
+ if(state=='ofight'&&opause){netLeave();SFX.back();return}
+ KP.Escape=true} // every other screen already treats Escape as back
+const _updRaw=update;update=function(){if(backClick)doBackClick();_updRaw()};
+const _drawRaw=draw;draw=function(){_drawRaw();if(!backBtnShown())return;ctx.save();ctx.setTransform(cv.width/W,0,0,cv.height/H,0,0);const b=BACKBTN,l=backLabel();
+ panel(b.x,b.y,b.w,b.h);text(l,b.x+b.w/2,b.y+13,'#ffffff',8,'center');ctx.restore()}
 
 // ===== Title screen (first thing shown) =====
 const VERSION='v1.3.0';

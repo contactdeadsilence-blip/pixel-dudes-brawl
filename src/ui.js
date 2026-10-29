@@ -186,3 +186,16 @@ function drawShop(){text('SKIN SHOP',W/2,24,PAL.Y,32,'center');acctBadge(W-4,4,'
 const UIS=new Set(['menu','settings','login','online','joincode','lobby','shop']);
 function drawUI(){if(state=='menu')drawMenu();else if(state=='settings')drawSettings();else if(state=='login')drawLogin();else if(state=='online')drawOnlineMenu();else if(state=='joincode')drawJoin();else if(state=='lobby')drawLobby();else if(state=='shop')drawShop()}
 function updUI(){if(state=='menu')updMenu();else if(state=='settings')updSettings();else if(state=='login')updLogin();else if(state=='online')updOnlineMenu();else if(state=='joincode')updJoin();else if(state=='lobby')updLobby();else if(state=='ofight')updOFight();else if(state=='oresult'){interp();updResult()}else if(state=='shop')updShop()}
+// ===== Mouse / touch BACK button (every screen except title & main menu) =====
+const BACKBTN={x:4,y:4,w:58,h:18};let backClick=false;
+function backBtnShown(){return !['title','menu'].includes(state)&&!(state=='ofight'&&!opause)&&!ST.wait&&!CAPTURE}
+function backLabel(){return state=='fight'?'PAUSE':(state=='pause'||state=='win'||state=='select')?'MENU':'BACK'}
+cv.addEventListener('pointerdown',e=>{if(!backBtnShown())return;const r=cv.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;
+ const b=BACKBTN;if(x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h){backClick=true;e.preventDefault()}});
+function doBackClick(){backClick=false;if(!backBtnShown())return;
+ if(state=='pause'||state=='win'||state=='select'){state='menu';SFX.back();return}
+ if(state=='ofight'&&opause){netLeave();SFX.back();return}
+ KP.Escape=true} // every other screen already treats Escape as back
+const _updRaw=update;update=function(){if(backClick)doBackClick();_updRaw()};
+const _drawRaw=draw;draw=function(){_drawRaw();if(!backBtnShown())return;ctx.save();ctx.setTransform(cv.width/W,0,0,cv.height/H,0,0);const b=BACKBTN,l=backLabel();
+ panel(b.x,b.y,b.w,b.h);text(l,b.x+b.w/2,b.y+13,'#ffffff',8,'center');ctx.restore()}
