@@ -458,16 +458,19 @@ toasts.slice(0,1).forEach((o,k)=>{const w=o.m.length*8+14,y=4-(o.t<10?(10-o.t)*2
  ctx.restore()}
 function hudName(f){if(state=='ofight'||state=='oresult'){const n=(NET.names[f.i]||'P'+(f.i+1)).slice(0,10);return f.i==NET.you?n:n}return f.cpu?'CPU':'P'+(f.i+1)}
 // ===== Accounts (online build only) =====
-const ACC={token:null,user:null};try{ACC.token=localStorage.getItem('pdbToken')}catch(e){}
+const ACC={token:null,user:null,checking:false};try{ACC.token=localStorage.getItem('pdbToken')||sessionStorage.getItem('pdbToken')}catch(e){}
+let REMEMBER=true;try{REMEMBER=localStorage.getItem('pdbRemember')!=='0'}catch(e){}
+function clearTok(){ACC.token=null;ACC.user=null;try{localStorage.removeItem('pdbToken');sessionStorage.removeItem('pdbToken')}catch(e){}}
 function api(path,body){return fetch('/api/'+path,{method:body?'POST':'GET',headers:Object.assign({'Content-Type':'application/json'},ACC.token?{Authorization:'Bearer '+ACC.token}:{}),body:body?JSON.stringify(body):undefined})
- .then(async r=>{let j={};try{j=await r.json()}catch(e){}if(!r.ok)throw new Error((j.error||('HTTP '+r.status)).toUpperCase());return j})}
-function setUser(j){if(j.token){ACC.token=j.token;try{localStorage.setItem('pdbToken',j.token)}catch(e){}}if(j.user)ACC.user=j.user;
+ .then(async r=>{let j={};try{j=await r.json()}catch(e){}if(!r.ok){const e=new Error((j.error||('HTTP '+r.status)).toUpperCase());e.status=r.status;throw e}return j})}
+function setUser(j){if(j.token){ACC.token=j.token;try{localStorage.removeItem('pdbToken');sessionStorage.removeItem('pdbToken');(REMEMBER?localStorage:sessionStorage).setItem('pdbToken',j.token)}catch(e){}}if(j.user)ACC.user=j.user;
  if(j.user&&j.user.settings&&Object.keys(j.user.settings).length&&j.fresh){Object.assign(SET,j.user.settings);try{localStorage.setItem('pdbSettings',JSON.stringify(SET))}catch(e){}loadKeys();applySet()}}
-function logout(){if(ACC.token)api('logout',{}).catch(()=>{});ACC.token=null;ACC.user=null;try{localStorage.removeItem('pdbToken')}catch(e){}netClose()}
+function logout(){if(ACC.token)api('logout',{}).catch(()=>{});clearTok();netClose()}
 function myUnlocks(){return ACC.user?ACC.user.unlocked:STARTER}
 const LOCKS=ONLINE;function owned(n){return !LOCKS||myUnlocks().includes(n)}
 let setSyncTimer=null;function onSetChange(){if(!ONLINE||!ACC.user)return;clearTimeout(setSyncTimer);setSyncTimer=setTimeout(()=>{const s=Object.assign({},SET);api('settings',{settings:s}).catch(()=>{})},600)}
-if(ONLINE&&ACC.token)api('me').then(j=>{j.fresh=true;setUser(j)}).catch(()=>{ACC.token=null});
+// auto-login with the token saved on this device; a rejected token (expired / server reset) is cleared so the login screen shows
+if(ONLINE&&ACC.token){ACC.checking=true;api('me').then(j=>{j.fresh=true;setUser(j);ACC.checking=false;toast('WELCOME BACK '+ACC.user.username+'!')}).catch(e=>{ACC.checking=false;if(e.status==401){clearTok();toast('PLEASE LOG IN AGAIN')}})}
 // ===== Small UI helpers =====
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function listNav(n,sel){if(mU()){SFX.sel();return (sel+n-1)%n}if(mD()){SFX.sel();return (sel+1)%n}return sel}
@@ -480,7 +483,7 @@ function acctBadge(x,y,al='left'){if(!ONLINE)return;const s=ACC.user?(ACC.user.u
 // ===== Main menu =====
 let menuSel=0;const menuItems=()=>ONLINE?['LOCAL BATTLE','ONLINE','SHOP','SETTINGS']:['LOCAL BATTLE','SETTINGS'];
 function updMenu(){const it=menuItems();menuSel=listNav(it.length,menuSel);if(mOK()||mStart()){const o=it[menuSel];SFX.ok();if(o=='LOCAL BATTLE')state='select';else if(o=='SETTINGS')openSettings('menu');else if(o=='ONLINE')goOnline();else if(o=='SHOP')goShop()}}
-function goOnline(){if(ACC.user){state='online';onlSel=0}else openLogin('online')}
+function goOnline(){if(ACC.checking){toast('SIGNING IN...');return}if(ACC.user){state='online';onlSel=0}else openLogin('online')}
 function goShop(from){SH.back=from||state;if(ACC.user){state='shop';api('me').then(setUser).catch(()=>{})}else openLogin('shop')}
 function drawMenu(){text('PIXEL DUDES',W/2,58,PAL.Y,48,'center');text('BRAWL',W/2,96,'#ffffff',32,'center');
  for(let k=0;k<4;k++){const sk=[0,1,2,3][k],x=((t*.6+k*130)%600)-60;drawSheet(imgs[sk],x,196-24,1,2,Math.floor(t/6)%4,1)}
@@ -536,11 +539,11 @@ function drawSettings(){text('SETTINGS',W/2,26,PAL.Y,32,'center');panel(30,34,42
 // ===== Login / register =====
 const LG={sel:0,user:'',pass:'',msg:'',busy:false,after:'online'};let OSK=null;
 function openLogin(after){LG.after=after;LG.sel=0;LG.msg='';state='login'}
-const LG_ITEMS=['USERNAME','PASSWORD','LOG IN','REGISTER','PLAY AS GUEST','BACK'];
+const LG_ITEMS=['USERNAME','PASSWORD','REMEMBER ME','LOG IN','REGISTER','PLAY AS GUEST','BACK'];
 function typeKey(ch){if(state=='login'&&LG.sel<2&&!LG.busy){const k=LG.sel?'pass':'user';if(ch=='\b')LG[k]=LG[k].slice(0,-1);else if(LG[k].length<(LG.sel?32:12)&&(LG.sel||/[A-Za-z0-9_]/.test(ch)))LG[k]+=LG.sel?ch:ch.toUpperCase();return true}
  if(state=='joincode'){if(ch=='\b'){JC.pos=Math.max(0,JC.pos-1);JC.code[JC.pos]='A'}else if(/[A-Za-z]/.test(ch)){JC.code[JC.pos]=ch.toUpperCase();JC.pos=Math.min(3,JC.pos+1)}SFX.sel();return true}return false}
 function authDo(kind){if(LG.busy)return;if(kind!='guest'&&(!LG.user||!LG.pass)){LG.msg='ENTER USERNAME AND PASSWORD';SFX.err();return}LG.busy=true;LG.msg='...';
- api(kind,kind=='guest'?{}:{username:LG.user,password:LG.pass}).then(j=>{j.fresh=true;setUser(j);LG.busy=false;LG.pass='';SFX.ok();toast('HI '+ACC.user.username+'!');if(LG.after=='shop')goShop('menu');else{state='online';onlSel=0}})
+ api(kind,kind=='guest'?{}:{username:LG.user,password:LG.pass}).then(j=>{j.fresh=true;setUser(j);if(kind!='guest'&&REMEMBER&&window.PasswordCredential&&navigator.credentials)try{navigator.credentials.store(new PasswordCredential({id:LG.user,password:LG.pass,name:LG.user})).catch(()=>{})}catch(e){}LG.busy=false;LG.pass='';SFX.ok();toast('HI '+ACC.user.username+'!');if(LG.after=='shop')goShop('menu');else{state='online';onlSel=0}})
   .catch(e=>{LG.busy=false;LG.msg=e.message;SFX.err()})}
 function updOSK(){const C='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_',n=C.length+2;if(mL())OSK.i=(OSK.i+n-1)%n;if(mR())OSK.i=(OSK.i+1)%n;if(mU())OSK.i=(OSK.i-10+n*10)%n;if(mD())OSK.i=(OSK.i+10)%n;
  if(anyPad(i=>padEdge(i,'A'))||KP.Enter){if(OSK.i<C.length){typeKey(LG.sel?C[OSK.i].toLowerCase():C[OSK.i]);SFX.sel()}else if(OSK.i==C.length){typeKey('\b');SFX.back()}else{OSK=null;SFX.ok()}}
@@ -548,11 +551,11 @@ function updOSK(){const C='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_',n=C.length+2;i
 function updLogin(){if(OSK){updOSK();return}if(KP.Tab)LG.sel=(LG.sel+1)%LG_ITEMS.length;LG.sel=listNav(LG_ITEMS.length,LG.sel);
  if(mBack()){state='menu';SFX.back();return}
  if(LG.sel<2&&anyPad(i=>padEdge(i,'A'))){OSK={i:0};SFX.ok();return}
- if(mOK()){if(LG.sel<2){LG.sel++;SFX.sel()}else if(LG.sel==2)authDo('login');else if(LG.sel==3)authDo('register');else if(LG.sel==4)authDo('guest');else{state='menu';SFX.back()}}}
+ if(mOK()){if(LG.sel<2){LG.sel++;SFX.sel()}else if(LG.sel==2){REMEMBER=!REMEMBER;try{localStorage.setItem('pdbRemember',REMEMBER?'1':'0')}catch(e){}SFX.sel()}else if(LG.sel==3)authDo('login');else if(LG.sel==4)authDo('register');else if(LG.sel==5)authDo('guest');else{state='menu';SFX.back()}}}
 function drawLogin(){text('ONLINE ACCOUNT',W/2,28,PAL.Y,32,'center');panel(90,38,300,182);
- LG_ITEMS.forEach((l,k)=>{const y=k<2?62+k*34:140+(k-2)*18;const on=k==LG.sel;
+ LG_ITEMS.forEach((l,k)=>{const y=k<2?62+k*34:134+(k-2)*15;const on=k==LG.sel;
   if(k<2){text(l,104,y,on?PAL.Y:'#d8dde6',8);panel(104,y+3,272,18,on?'#5d4a6e':'#3b3f52');const v=k?'*'.repeat(LG.pass.length):LG.user;text(v+(on&&Math.floor(t/20)%2?'_':''),110,y+17,'#ffffff',16)}
-  else{if(on){ctx.fillStyle='#5d4a6e';ctx.fillRect(140,y-13,200,17)}text(on?'\u2192 '+l+' \u2190':l,W/2,y,on?PAL.Y:'#ffffff',16,'center')}});
+  else{if(on){ctx.fillStyle='#5d4a6e';ctx.fillRect(140,y-12,200,15)}const L=k==2?l+': '+(REMEMBER?'ON':'OFF'):l;text(on?'\u2192 '+L+' \u2190':L,W/2,y,on?PAL.Y:'#ffffff',16,'center')}});
  if(LG.msg)text(LG.msg,W/2,214,LG.msg=='...'?'#d8dde6':'#f99252',8,'center');
  if(OSK){const C='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_'.split('').concat(['DEL','OK']);panel(60,118,360,92,'#3b3f52');C.forEach((c,k)=>{const x=72+(k%10)*34,y=136+Math.floor(k/10)*18;if(k==OSK.i){ctx.fillStyle='#5d4a6e';ctx.fillRect(x-6,y-13,30,17)}text(c,x+9,y,k==OSK.i?PAL.Y:'#ffffff',c.length>1?8:16,'center')})}
  bar(OSK?[[['A'],'TYPE'],[['X'],'DEL'],[['B'],'DONE']]:[[['DP'],'SELECT'],[['A'],LG.sel<2?'KEYBOARD':'OK'],[['B'],'BACK']],[[['TAB'],'NEXT'],[['ENTER'],'OK'],[['ESC'],'BACK']])}

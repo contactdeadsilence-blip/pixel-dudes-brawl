@@ -19,7 +19,10 @@ const q={byName:db.prepare('SELECT * FROM users WHERE username=?'),byId:db.prepa
  log:db.prepare('INSERT INTO purchases(user_id,skin,price,ts) VALUES(?,?,?,?)')};
 const pub=u=>({username:u.username,coins:u.coins,unlocked:JSON.parse(u.unlocked||'[]'),settings:JSON.parse(u.settings||'{}'),guest:!!u.guest});
 const newSession=u=>{const t=crypto.randomBytes(24).toString('hex');q.sess.run(t,u.id,Date.now());return t};
-const userOf=t=>t?q.tok.get(String(t)):null;
+const SESS_MS=90*864e5,touchTok=db.prepare('UPDATE sessions SET created=? WHERE token=?'),ageTok=db.prepare('SELECT created FROM sessions WHERE token=?');
+db.prepare('DELETE FROM sessions WHERE created<?').run(Date.now()-SESS_MS);
+// sliding 90-day sessions: each use extends the expiry; expired tokens are deleted and rejected
+const userOf=t=>{if(!t)return null;t=String(t);const r=ageTok.get(t);if(!r)return null;if(r.created<Date.now()-SESS_MS){q.delTok.run(t);return null}if(Date.now()-r.created>36e5)touchTok.run(Date.now(),t);return q.tok.get(t)||null};
 
 const app=express();app.use(express.json({limit:'32kb'}));
 const auth=(req,res,next)=>{const t=(req.get('authorization')||'').replace(/^Bearer /,'');const u=userOf(t);if(!u)return res.status(401).json({error:'not logged in'});req.user=u;req.token=t;next()};
