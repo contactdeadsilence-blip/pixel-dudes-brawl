@@ -3,8 +3,10 @@
 const PRICES=[0,0,0,0,200,200,200,250,250,250,300,300,300,350,350,350,400,400,450,450,500];
 const STARTER=[0,1,2,3];
 const TIERS=[['BRONZE',0,'#c77b3f'],['SILVER',1100,'#c0c8d8'],['GOLD',1200,'#fee761'],['PLATINUM',1300,'#7fe0d0'],['DIAMOND',1400,'#8fb8ff']];
+const MODES=[{id:'stock',n:'STOCK',d:'LAST ONE STANDING'},{id:'time',n:'TIME',d:'MOST KOS WHEN TIME RUNS OUT'},{id:'koth',n:'KING OF THE HILL',d:'HOLD THE ZONE FOR 30 SECONDS'},{id:'teams',n:'TEAMS 2V2',d:'P1+P3 VS P2+P4'},{id:'coin',n:'COIN RUSH',d:'FIRST TO 15 COINS'}];
 const CHALLENGES=[{id:'play3',txt:'PLAY 3 MATCHES',n:3,r:40,k:'play'},{id:'kos10',txt:'LAND 10 KOS',n:10,r:50,k:'kos'},{id:'win2',txt:'WIN 2 MATCHES',n:2,r:60,k:'win'},
- {id:'onl2',txt:'PLAY 2 ONLINE MATCHES',n:2,r:50,k:'online'},{id:'owin',txt:'WIN AN ONLINE MATCH',n:1,r:80,k:'owin'},{id:'kos3m',txt:'GET 3 KOS IN ONE MATCH',n:1,r:60,k:'kos3'},
+ {id:'onl2',txt:'PLAY 2 ONLINE MATCHES',n:2,r:50,k:'online'},{id:'owin',txt:'WIN AN ONLINE MATCH',n:1,r:80,k:'owin'},{id:'koth1',txt:'PLAY KING OF THE HILL',n:1,r:40,k:'mode',m:'koth'},{id:'coinw',txt:'WIN A COIN RUSH',n:1,r:70,k:'modewin',m:'coin'},{id:'team2',txt:'PLAY 2 TEAM MATCHES',n:2,r:50,k:'mode',m:'teams'},
+ {id:'kos3m',txt:'GET 3 KOS IN ONE MATCH',n:1,r:60,k:'kos3'},
  {id:'flaw',txt:'WIN WITHOUT LOSING A STOCK',n:1,r:100,k:'flaw'},{id:'full4',txt:'PLAY A 4-FIGHTER MATCH',n:1,r:30,k:'four'}];
 function chalAdd(c,e){switch(c.k){case 'play':return 1;case 'kos':return e.kos|0;case 'win':return e.won?1:0;case 'online':return e.online?1:0;case 'owin':return e.online&&e.won?1:0;
  case 'kos3':return (e.kos|0)>=3?1:0;case 'flaw':return e.flawless?1:0;case 'four':return e.players>=4?1:0;case 'mode':return e.mode==c.m?1:0;case 'modewin':return e.mode==c.m&&e.won?1:0}return 0}
@@ -16,6 +18,8 @@ const SFX=new Proxy({},{get:(_,k)=>a=>{H.sfx&&H.sfx(k,a)}});
 function addShake(v){H.shake&&H.shake(v)}
 function burst(x,y,c,n,sp){H.burst&&H.burst(x,y,c,n,sp)}
 let F=[],map=null,arena=0,WW=960,WH=544,readyT=0,endT=0,winner=null,hitstop=0,timer=0,tick=0,opts={stocks:3,diff:1,time:0};
+const KOTH_GOAL=1800,COIN_GOAL=15;let HILL=null,hillT=0,CO=[],coinT=0;
+function endless(){return opts.mode=='time'||opts.mode=='koth'||opts.mode=='coin'}
 let stageL=0,stageR=W,stageTop=0;let IT=[],PR=[],itemT=0;const rnd=H.rand||Math.random;
 function build(w,h,ops){const g=[];for(let y=0;y<h;y++)g.push(Array(w).fill(' '));for(const [c,x0,x1,y0,y1] of ops)for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)g[y][x]=c;return g}
 const ARENAS=[
@@ -56,7 +60,7 @@ function updF(f,inp){if(f.out)return;if(f.respawn>0){if(--f.respawn==0)spawn(f);
  f.vy+=f.dashT>0?.05:(f.ff?.6:.35);f.vy=Math.min(f.vy,f.ff?7.5:5);
  const vy0=f.vy;moveX(f);if(moveY(f)){f.ground=true;if(vy0>2.6)SFX.land()}f.anim+=Math.abs(f.vx)*.1;
  if(f.hit)doHits(f);
- if(f.x<-96||f.x>WW+96||f.y>WH+64||f.y<-220){f.stocks--;SFX.ko();addShake(10);H.ko&&H.ko(f);if(f.lastHit!=null&&f.lastHit!=f.i)H.kill&&H.kill(f.lastHit,f.i);f.lastHit=null;f.buf={spd:0,sh:0,ham:0,bomb:0};if(f.stocks<=0){f.out=true}else f.respawn=60;f.vx=f.vy=0;f.dmg=0}}
+ if(f.x<-96||f.x>WW+96||f.y>WH+64||f.y<-220){f.stocks--;SFX.ko();addShake(10);H.ko&&H.ko(f);if(f.lastHit!=null&&f.lastHit!=f.i)H.kill&&H.kill(f.lastHit,f.i);koScore(f);f.lastHit=null;f.buf={spd:0,sh:0,ham:0,bomb:0};if(endless())f.stocks=Math.max(1,f.stocks+1);if(f.stocks<=0){f.out=true}else f.respawn=60;f.vx=f.vy=0;f.dmg=0}}
 function stageBounds(){let l=99,r=0,tp=99;map.forEach((row,y)=>row.forEach((c,x)=>{if(c!=' '){l=Math.min(l,x);r=Math.max(r,x);if(solidCh(c))tp=Math.min(tp,y)}}));stageL=l*T;stageR=(r+1)*T;stageTop=tp*T}
 function groundBelow(x,y){const tx=Math.floor(x/T);if(tx<0||tx>=map[0].length)return -1;for(let ty=Math.max(0,Math.floor(y/T));ty<map.length;ty++){if(map[ty][tx]!=' ')return ty}return -1}
 function safeX(cx,y,pref){if(pref){for(let d=0;d<16;d++){const x=cx+pref*d*T;if(groundBelow(x,y)>=0)return x+pref*T}}for(let d=0;d<50;d++)for(const s of [1,-1]){const x=cx+s*d*T;if(groundBelow(x,y)>=0)return x+s*T}return WW/2}
@@ -66,6 +70,9 @@ function ai(f){const DF=[.45,1,1.7][opts.diff]||1;const o={l:0,r:0,u:0,d:0,upE:0
   if(f.vy>0.3&&f.jumps>0&&A.j<=0){o.upE=1;A.j=12}else if(f.jumps==0&&f.vy>0.5&&f.airDash&&f.dashCd<=0&&Math.abs(sx-cx)>24){f.face=dir;o.sp=1}return o}
  for(const it of IT){const dx=it.x-f.x,dy=it.y-f.y;if(Math.abs(dx)<90&&Math.abs(dy)<24&&!(ITEM_KINDS[it.k]=='bomb'&&f.buf.bomb)){if(dx>4)o.r=1;else if(dx<-4)o.l=1;return o}}
  let tg=null,bd=1e9;for(const g of F){if(g==f||g.out||g.respawn>0||friendly(f,g)||(opts.teams&&g.team==f.team))continue;const d=Math.hypot(g.x-f.x,g.y-f.y);if(d<bd){bd=d;tg=g}}if(!tg)return o;
+ {const P=(x,y)=>({x,y,w:10,h:20,dmg:0,vx:0,vy:0,ground:true,pseudo:1});
+  if(opts.mode=='koth'&&HILL&&!ov(f,HILL)&&(bd>36||(f.i+(tick>>7))%3))tg=P(HILL.x+HILL.w/2-5,HILL.y+HILL.h-20);
+  if(opts.mode=='coin'){let bc=null,cd=bd>40?320:90;for(const c of CO){const d=Math.hypot(c.x-f.x,c.y-f.y);if(d<cd){cd=d;bc=c}}if(bc)tg=P(bc.x-1,bc.y-12)}}
  const dx=tg.x-f.x,dy=tg.y-f.y,R=Math.random()/DF;if(opts.diff==0&&A.last&&Math.random()<.4)return A.last;A.last=o;
  if(Math.abs(dx)>12){if(dx>0)o.r=1;else o.l=1}
  if(f.ground&&(o.r||o.l)){const nx=cx+(o.r?14:-14);if(groundBelow(nx,feet)<0){if(tg.y+tg.h<=feet+8&&Math.abs(dx)<260&&A.j<=0&&groundBelow(cx+(o.r?1:-1)*Math.min(Math.abs(dx),150),feet-40)>=0){o.upE=1;A.j=25;A.gapDir=o.r?1:-1;A.gapT=50}else o.l=o.r=0}}
@@ -77,9 +84,9 @@ function ai(f){const DF=[.45,1,1.7][opts.diff]||1;const o={l:0,r:0,u:0,d:0,upE:0
  else if(Math.abs(dx)<22&&Math.abs(dy)<16&&R<.22&&tg.inv<=0){f.face=dx>0?1:-1;o.l=o.r=0;o.ap=1}
  else if(Math.abs(dx)>40&&Math.abs(dx)<120&&Math.abs(dy)<10&&f.dashCd<=0&&R<.03&&f.ground&&groundBelow(cx+(dx>0?60:-60),feet)>=0){f.face=dx>0?1:-1;o.sp=1}
  if(R>.995&&f.ground){o.upE=1}return o}
-function startFight(slots,ar,o){opts=Object.assign({stocks:3,diff:1,time:0,items:0,ff:true},o||{});arena=ar;map=ARENAS[arena].map;WW=map[0].length*T;WH=map.length*T;stageBounds();F=[];
+function startFight(slots,ar,o){opts=Object.assign({stocks:3,diff:1,time:0,items:0,ff:true,mode:'stock'},o||{});if(!MODES.some(m=>m.id==opts.mode))opts.mode='stock';opts.teams=opts.mode=='teams';if(endless()&&!opts.time)opts.time=(opts.mode=='time'?120:180)*60;arena=ar;map=ARENAS[arena].map;WW=map[0].length*T;WH=map.length*T;stageBounds();F=[];
  slots.forEach((s,i)=>{if(!s||s.type=='none')return;const f={i,cpu:s.type=='cpu',skin:s.skin,name:s.name||'',x:0,y:0,w:10,h:20,vx:0,vy:0,face:i<2?1:-1,dmg:0,stocks:opts.stocks,out:false,respawn:0,inv:0,jumps:1,atkT:0,dashT:0,dashCd:0,airDash:true,hitstun:0,flash:0,dropT:0,ground:false,ff:false,hit:null,trail:[],anim:0,ai:{j:0},lastHit:null,buf:{spd:0,sh:0,ham:0,bomb:0},team:s.team!=null?s.team:i};spawn(f,true);F.push(f)});
- readyT=100;endT=0;winner=null;hitstop=0;timer=opts.time||0;tick=0;IT=[];PR=[];itemT=Math.round((ITEM_INT[opts.items|0]||0)*.5)}
+ readyT=100;endT=0;winner=null;hitstop=0;timer=opts.time||0;tick=0;pickHill();hillT=1200;CO=[];coinT=60;F.forEach(f=>{f.pts=0;if(opts.teams)f.team=f.i%2});IT=[];PR=[];itemT=Math.round((ITEM_INT[opts.items|0]||0)*.5)}
 function friendly(a,b){return opts.teams&&!opts.ff&&a.team==b.team}
 // ===== Items: periodic stage drops, simulated here so the server is authoritative online =====
 function spawnItem(){if(IT.length>=3)return;for(let n=0;n<24;n++){const x=stageL+8+rnd()*(stageR-stageL-26);if(groundBelow(x+5,0)<0||groundBelow(x+15,0)<0)continue;
@@ -97,20 +104,35 @@ function stepItems(){if(readyT>0||endT)return;if(itemT>0&&--itemT==0){spawnItem(
  for(let n=PR.length-1;n>=0;n--){const p=PR[n];p.t++;p.vy=Math.min(6,p.vy+.22);p.x+=p.vx;p.y+=p.vy;let boom=p.t>150||solid(p.x,p.y)||(p.vy>0&&tileAt(p.x,p.y)=='-');
   if(!boom)for(const g of F){if(g.i==p.o&&p.t<20||g.out||g.respawn>0)continue;if(p.x>g.x-2&&p.x<g.x+g.w+2&&p.y>g.y-2&&p.y<g.y+g.h+2){boom=true;break}}
   if(boom){explode(p.x,p.y,p.o);PR.splice(n,1)}else if(p.y>WH+60||p.x<-200||p.x>WW+200)PR.splice(n,1)}}
-function rank(){return F.slice().sort((a,b)=>(b.out?0:b.stocks)-(a.out?0:a.stocks)||a.dmg-b.dmg)}
+function surfaceAt(x){const r=groundBelow(x,Math.max(0,stageTop-200));return r}
+function pickHill(){HILL=null;for(let n=0;n<40;n++){const w=56,x=stageL+4+rnd()*(stageR-stageL-w-8),y0=Math.max(0,stageTop-(n<30?90:0)-rnd()*40),r=groundBelow(x,y0);if(r<0||groundBelow(x+w-1,y0)!=r||groundBelow(x+w/2,y0)!=r)continue;const h={x:Math.round(x),y:r*T-44,w,h:44};if(HILL&&Math.abs(HILL.x-h.x)<60)continue;HILL=h;return}
+ HILL={x:Math.round((stageL+stageR)/2-28),y:stageTop-44,w:56,h:44}}
+function koScore(f){const k=f.lastHit!=null&&f.lastHit!=f.i?F.find(g=>g.i==f.lastHit):null;
+ if(opts.mode=='time'){f.pts--;if(k)k.pts+=2}
+ if(opts.mode=='coin'){const drop=Math.min(f.pts,Math.ceil(f.pts/2));f.pts-=drop;for(let n=0;n<drop&&CO.length<14;n++){const x=stageL+12+rnd()*(stageR-stageL-24);CO.push({x,y:stageTop-120-rnd()*40,vy:0,w:8,h:8,life:600})}}}
+function stepModes(){if(readyT>0||endT)return;const m=opts.mode;
+ if(m=='koth'){if(--hillT<=0){pickHill();hillT=1200;SFX.count()}const ins=F.filter(f=>!f.out&&f.respawn<=0&&ov(f,HILL));HILL.who=ins.length==1?ins[0].i:(ins.length?-2:-1);
+  if(ins.length==1){const f=ins[0];f.pts++;if(f.pts>=KOTH_GOAL){winner=f;endT=90;SFX.game()}}}
+ if(m=='coin'){if(--coinT<=0){coinT=75;if(CO.length<6){const x=stageL+12+rnd()*(stageR-stageL-24);if(groundBelow(x,0)>=0)CO.push({x,y:Math.max(-40,stageTop-180),vy:0,w:8,h:8,life:900})}}
+  for(let n=CO.length-1;n>=0;n--){const c=CO[n];c.life--;if(c.vy>=0&&tileAt(c.x+4,c.y+c.h+c.vy+.1)!=' '&&tileAt(c.x+4,c.y+c.h-.1)==' '){c.y=Math.floor((c.y+c.h+c.vy+.1)/T)*T-c.h;c.vy=0}else{c.vy=Math.min(4,c.vy+.25);c.y+=c.vy}
+   if(c.life<=0||c.y>WH+20){CO.splice(n,1);continue}
+   for(const f of F){if(f.out||f.respawn>0)continue;if(ov(c,f)){f.pts++;SFX.coin();burst(c.x+4,c.y+4,'#fee761',6,1.2);CO.splice(n,1);if(f.pts>=COIN_GOAL&&!endT){winner=f;endT=90;SFX.game()}break}}}}}
+function score(f){return endless()?f.pts:(f.out?0:f.stocks)}
+function rank(){return F.slice().sort((a,b)=>score(b)-score(a)||a.dmg-b.dmg)}
 function step(getInp){tick++;if(readyT>0){readyT--;if(readyT==99||readyT==65)SFX.count();if(readyT==30)SFX.go()}
- if(hitstop>0)hitstop--;else{for(const f of F)updF(f,f.cpu?ai(f):(getInp(f.i)||{}));stepItems()}
- if(timer>0&&readyT<=0&&!endT){timer--;if(timer==0){const r=rank();winner=(r.length>1&&r[0].stocks==r[1].stocks&&r[0].dmg==r[1].dmg)?null:r[0];endT=90;SFX.game()}}
- const alive=F.filter(f=>!f.out);if(alive.length<=1&&!endT){endT=90;winner=alive[0]||null;SFX.game()}
+ if(hitstop>0)hitstop--;else{for(const f of F)updF(f,f.cpu?ai(f):(getInp(f.i)||{}));stepItems();stepModes()}
+ if(timer>0&&readyT<=0&&!endT){timer--;if(timer==0){const r=rank();winner=(r.length>1&&score(r[0])==score(r[1])&&(endless()||r[0].dmg==r[1].dmg))?null:r[0];endT=90;SFX.game()}}
+ const alive=F.filter(f=>!f.out);if(opts.teams&&!endT&&new Set(alive.map(f=>f.team)).size<=1&&new Set(F.map(f=>f.team)).size>1){endT=90;winner=alive[0]||null;SFX.game()}
+ if(!opts.teams&&!endless()&&alive.length<=1&&!endT){endT=90;winner=alive[0]||null;SFX.game()}
  if(endT&&--endT==0)return 'win';return null}
 // compact snapshot for the network
 function snap(){return F.map(f=>[Math.round(f.x*10),Math.round(f.y*10),Math.round(f.vx*10),Math.round(f.vy*10),f.face,Math.round(f.dmg),f.stocks,(f.out?1:0)|(f.ground?2:0)|(f.cpu?4:0),f.respawn,f.inv,f.atkT,f.dashT,f.hitstun,f.flash])}
-function snapX(){return {I:IT.map(i=>[i.k,Math.round(i.x),Math.round(i.y),i.life]),P:PR.map(p=>[Math.round(p.x),Math.round(p.y)]),B:F.map(f=>(f.buf.spd>0?1:0)|(f.buf.sh>0?2:0)|(f.buf.ham>0?4:0)|(f.buf.bomb?8:0))}}
-function unsnapX(o){if(!o)return;IT=(o.I||[]).map(a=>({k:a[0],x:a[1],y:a[2],w:10,h:10,vy:0,life:a[3]}));PR=(o.P||[]).map(a=>({x:a[0],y:a[1]}));(o.B||[]).forEach((b,k)=>{const f=F[k];if(f)f.buf={spd:b&1,sh:b&2?1:0,ham:b&4?1:0,bomb:b&8?1:0}})}
+function snapX(){return {I:IT.map(i=>[i.k,Math.round(i.x),Math.round(i.y),i.life]),P:PR.map(p=>[Math.round(p.x),Math.round(p.y)]),M:[HILL?[HILL.x,HILL.y,HILL.w,HILL.h,HILL.who|0]:0,CO.map(c=>[Math.round(c.x),Math.round(c.y)]),F.map(f=>f.pts|0),F.map(f=>f.team)],B:F.map(f=>(f.buf.spd>0?1:0)|(f.buf.sh>0?2:0)|(f.buf.ham>0?4:0)|(f.buf.bomb?8:0))}}
+function unsnapX(o){if(!o)return;IT=(o.I||[]).map(a=>({k:a[0],x:a[1],y:a[2],w:10,h:10,vy:0,life:a[3]}));PR=(o.P||[]).map(a=>({x:a[0],y:a[1]}));if(o.M){const M=o.M;HILL=M[0]?{x:M[0][0],y:M[0][1],w:M[0][2],h:M[0][3],who:M[0][4]}:null;CO=M[1].map(a=>({x:a[0],y:a[1],w:8,h:8}));M[2].forEach((p,k)=>{if(F[k])F[k].pts=p});M[3].forEach((t,k)=>{if(F[k])F[k].team=t})}(o.B||[]).forEach((b,k)=>{const f=F[k];if(f)f.buf={spd:b&1,sh:b&2?1:0,ham:b&4?1:0,bomb:b&8?1:0}})}
 function unsnap(a,f){f.x=a[0]/10;f.y=a[1]/10;f.vx=a[2]/10;f.vy=a[3]/10;f.face=a[4];f.dmg=a[5];f.stocks=a[6];f.out=!!(a[7]&1);f.ground=!!(a[7]&2);f.cpu=!!(a[7]&4);f.respawn=a[8];f.inv=a[9];f.atkT=a[10];f.dashT=a[11];f.hitstun=a[12];f.flash=a[13];return f}
-return{ARENAS,T,PCOL,startFight,step,hitbox,onGround,snap,unsnap,snapX,unsnapX,rank,ITEM_KINDS,get items(){return IT},get projs(){return PR},
+return{ARENAS,T,PCOL,startFight,step,hitbox,onGround,snap,unsnap,snapX,unsnapX,rank,ITEM_KINDS,get items(){return IT},get hill(){return HILL},get coins(){return CO},get hillT(){return hillT},score,MODES,KOTH_GOAL,COIN_GOAL,get projs(){return PR},
  get F(){return F},get map(){return map},get arena(){return arena},get WW(){return WW},get WH(){return WH},get readyT(){return readyT},get endT(){return endT},get winner(){return winner},get hitstop(){return hitstop},get timer(){return timer},get tick(){return tick},get opts(){return opts},
  setCPU(i,v){const f=F.find(f=>f.i==i);if(f)f.cpu=v}}}
-const api={createCore,PRICES,STARTER,TIERS,tierOf,CHALLENGES,chalAdd,ITEM_KINDS,ITEM_NAMES};
+const api={createCore,PRICES,STARTER,TIERS,tierOf,CHALLENGES,chalAdd,ITEM_KINDS,ITEM_NAMES,MODES};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.PDBCore=api;
 })(typeof window!=='undefined'?window:globalThis);

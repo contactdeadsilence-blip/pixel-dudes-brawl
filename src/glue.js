@@ -6,7 +6,7 @@ function partFx(x,y){if(parts.length<PMAX)parts.push({x,y,vx:(Math.random()-.5)*
 function koFx(x,y,i){const bx=Math.max(cam.x+6,Math.min(cam.x+cam.vw-6,x)),by=Math.max(cam.y+6,Math.min(cam.y+cam.vw*H/W-6,y));burst(bx,by,PCOL[i],30,4);burst(bx,by,'#ffffff',20,3)}
 function syncCore(){F=CORE.F;map=CORE.map;WW=CORE.WW;WH=CORE.WH;readyT=CORE.readyT;endT=CORE.endT;winner=CORE.winner;hitstop=CORE.hitstop;arena=CORE.arena}
 // ===== Settings =====
-const DEF_SET={master:.8,music:.6,sfx:.8,mute:false,shake:0,fullscreen:false,fps:false,scale:0,prompts:0,dz:.35,diff:1,stocks:3,timer:0,items:2,keys:null};
+const DEF_SET={master:.8,music:.6,sfx:.8,mute:false,shake:0,fullscreen:false,fps:false,scale:0,prompts:0,dz:.35,diff:1,stocks:3,timer:0,items:2,mode:'stock',ff:false,keys:null};
 let SET=Object.assign({},DEF_SET);try{Object.assign(SET,JSON.parse(localStorage.getItem('pdbSettings')||'{}'));if(!localStorage.getItem('pdbSettings')&&localStorage.getItem('pdbShake')!=null)SET.shake=+localStorage.getItem('pdbShake')}catch(e){}
 function saveSet(){try{localStorage.setItem('pdbSettings',JSON.stringify(SET))}catch(e){}applySet();if(typeof onSetChange=='function')onSetChange()}
 function applySet(){DZ=SET.dz;auVol();applyScale()}

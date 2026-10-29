@@ -98,10 +98,10 @@ app.use(express.static(path.join(__dirname,'..','public')));
 const rooms=new Map();const CODECH='ABCDEFGHJKLMNPQRSTUVWXYZ';
 const mkCode=()=>{let c;do{c=Array.from({length:4},()=>CODECH[Math.floor(Math.random()*CODECH.length)]).join('')}while(rooms.has(c));return c};
 const send=(ws,o)=>{if(ws&&ws.readyState==1)ws.send(JSON.stringify(o))};
-function newRoom(quick){const r={code:mkCode(),quick,slots:[null,null,null,null],host:null,arena:Math.floor(Math.random()*4),state:'lobby',created:Date.now(),countAt:0,fillAt:quick?Date.now()+QUICK_FILL_MS:0,core:null,loop:null};rooms.set(r.code,r);return r}
+function newRoom(quick){const r={code:mkCode(),quick,slots:[null,null,null,null],host:null,arena:Math.floor(Math.random()*4),mode:'stock',items:ONLINE_RULES.items,ff:false,state:'lobby',created:Date.now(),countAt:0,fillAt:quick?Date.now()+QUICK_FILL_MS:0,core:null,loop:null};rooms.set(r.code,r);return r}
 const humans=r=>r.slots.filter(s=>s&&s.type=='human'&&s.ws);
 function lobbyMsg(r,ws){const you=r.slots.findIndex(s=>s&&s.ws===ws),now=Date.now();
- return {t:'lobby',code:r.code,quick:r.quick,host:r.host===ws,you,arena:r.arena,
+ return {t:'lobby',code:r.code,quick:r.quick,host:r.host===ws,you,arena:r.arena,mode:r.mode||'stock',items:r.items|0,ff:!!r.ff,
   slots:r.slots.map(s=>{if(!s)return null;const u=s.uid&&s.ws?q.byId.get(s.uid):null;return {type:s.type,name:s.name,skin:s.skin,host:s.ws&&s.ws===r.host,tier:u&&!u.guest?PDB.tierOf(u.rating):null,rating:u&&!u.guest?u.rating:null}}),ranked:r.quick,
   count:r.countAt?Math.max(0,Math.ceil((r.countAt-now)/1000)):-1,fill:r.quick&&r.fillAt&&!r.countAt?Math.max(0,Math.ceil((r.fillAt-now)/1000)):-1}}
 const pushLobby=r=>{for(const s of humans(r))send(s.ws,lobbyMsg(r,s.ws))};
@@ -121,8 +121,8 @@ function startMatch(r){r.state='fight';r.countAt=0;r.fillAt=0;if(r.quick)r.arena
  r.core=PDB.createCore({sfx:(k,a)=>ev.push(a!=null?['s',k,a]:['s',k]),shake:v=>ev.push(['k',v]),burst:(x,y,c,n,sp)=>{if(ev.length<200)ev.push(['b',Math.round(x),Math.round(y),c,n,sp])},
   part:(x,y)=>{if(ev.length<200)ev.push(['p',Math.round(x),Math.round(y)])},ko:f=>ev.push(['o',f.i,Math.round(f.x),Math.round(f.y)]),
   kill:(k,v)=>{if(k!=null&&k!==v&&r.slots[k])r.slots[k].kos++}});
- const slots=r.slots.map(s=>s?{type:s.type,skin:s.skin,name:s.name}:{type:'none'});r.core.startFight(slots,r.arena,ONLINE_RULES);
- humans(r).forEach(s=>send(s.ws,{t:'start',you:r.slots.indexOf(s),slots:r.slots.map(s=>s?{type:s.type,skin:s.skin,name:s.name}:null),arena:r.arena,stocks:ONLINE_RULES.stocks}));
+ const slots=r.slots.map(s=>s?{type:s.type,skin:s.skin,name:s.name}:{type:'none'});r.core.startFight(slots,r.arena,Object.assign({},ONLINE_RULES,{mode:r.mode||'stock',items:r.items|0,ff:!!r.ff}));
+ humans(r).forEach(s=>send(s.ws,{t:'start',you:r.slots.indexOf(s),slots:r.slots.map(s=>s?{type:s.type,skin:s.skin,name:s.name}:null),arena:r.arena,stocks:ONLINE_RULES.stocks,mode:r.core.opts.mode,time:r.core.opts.time,items:r.items|0,ff:!!r.ff}));
  r.loop=setInterval(()=>tickRoom(r),1000/60)}
 const BITS=['l','r','u','d','a','s'],EB=['upE','dE','ap','sp'];
 function tickRoom(r){const c=r.core;let res;try{res=c.step(i=>{const s=r.slots[i];if(!s||!s.inp)return {};const o={};BITS.forEach((k,j)=>o[k]=!!(s.inp.b&1<<j));EB.forEach((k,j)=>o[k]=!!(s.inp.e&1<<j));s.inp.e=0;return o})}catch(e){console.error('step',e);res='win'}
@@ -153,6 +153,7 @@ wss.on('connection',(ws,req)=>{const tok=new URL(req.url,'http://x').searchParam
    case 'skin':{if(!r||r.state!='lobby')break;const s=r.slots.find(s=>s&&s.ws===ws);const k=m.skin;if(!s||!Number.isInteger(k))break;
     const un=JSON.parse(q.byId.get(ws.user.id).unlocked);if(!un.includes(k)){send(ws,{t:'err',m:'SKIN LOCKED'});break}s.skin=k;ws.pref=k;pushLobby(r);break}
    case 'arena':if(r&&!r.quick&&r.host===ws&&r.state=='lobby'&&Number.isInteger(m.arena)&&m.arena>=0&&m.arena<4){r.arena=m.arena;pushLobby(r)}break;
+   case 'rules':if(r&&!r.quick&&r.host===ws&&r.state=='lobby'){if(PDB.MODES.some(x=>x.id==m.mode))r.mode=m.mode;if(Number.isInteger(m.items)&&m.items>=0&&m.items<4)r.items=m.items;if(m.ff!=null)r.ff=!!m.ff;pushLobby(r)}break;
    case 'addcpu':if(r&&!r.quick&&r.host===ws&&r.state=='lobby'){addCPU(r);pushLobby(r)}break;
    case 'delcpu':if(r&&!r.quick&&r.host===ws&&r.state=='lobby'){for(let i=3;i>=0;i--)if(r.slots[i]&&r.slots[i].type=='cpu'){r.slots[i]=null;break}pushLobby(r)}break;
    case 'start':if(r&&!r.quick&&r.host===ws&&r.state=='lobby'){if(r.slots.filter(Boolean).length<2)send(ws,{t:'err',m:'NEED 2+ FIGHTERS'});else startMatch(r)}break;

@@ -126,7 +126,7 @@ function netOpen(first){if(NET.ws&&NET.ws.readyState<=1){if(NET.ws.readyState==1
 function netClose(){if(NET.ws){const w=NET.ws;NET.ws=null;try{w.close()}catch(e){}}NET.lobby=null}
 function netLeave(){netSend({t:'leave'});NET.lobby=null;state='online';opause=false}
 function netMsg(m){if(m.t=='lobby'){NET.lobby=m;if(state=='online'||state=='joincode')state='lobby'}
- else if(m.t=='start'){NET.you=m.you;NET.names=m.slots.map(s=>s?s.name:'');CORE.startFight(m.slots,m.arena,{stocks:m.stocks});syncCore();arena=m.arena;parts=[];NET.snaps=[];NET.rt=-1;NET.lb=-1;NET.res=null;opause=false;state='ofight';camUpdate(true)}
+ else if(m.t=='start'){NET.you=m.you;NET.names=m.slots.map(s=>s?s.name:'');CORE.startFight(m.slots,m.arena,{stocks:m.stocks,mode:m.mode||'stock',time:m.time||0,items:m.items|0,ff:!!m.ff});syncCore();arena=m.arena;parts=[];NET.snaps=[];NET.rt=-1;NET.lb=-1;NET.res=null;opause=false;state='ofight';camUpdate(true)}
  else if(m.t=='snap'){if(state!='ofight'&&!(state=='settings'&&ST.back=='ofight'))return;NET.snaps.push(m);if(NET.snaps.length>40)NET.snaps.shift();
   for(const e of m.ev||[]){if(e[0]=='s'){SFX[e[1]]&&SFX[e[1]](e[2])}else if(e[0]=='k')addShake(e[1]);else if(e[0]=='b')burst(e[1],e[2],e[3],e[4],e[5]);else if(e[0]=='o')koFx(e[2],e[3],e[1]);else if(e[0]=='p')partFx(e[1],e[2])}}
  else if(m.t=='end'){NET.res=m;chalToast(m.chal);if(ACC.user&&m.coins!=null)ACC.user.coins=m.coins;const r=m.rank.find(r=>r.i==NET.you);if(r&&r.coins)setTimeout(()=>SFX.coin(),900);if(state=='settings')state='oresult';else state='oresult';opause=false}
@@ -163,6 +163,8 @@ function updLobby(){const L=NET.lobby;if(mBack()){SFX.back();netLeave();return}i
  if(mL())lobbySkin(-1);if(mR())lobbySkin(1);
  if(L.host&&!L.quick){if(KP.KeyQ||anyPad(i=>padEdge(i,'LB'))){netSend({t:'arena',arena:(L.arena+ARENAS.length-1)%ARENAS.length});SFX.sel()}if(KP.KeyE||anyPad(i=>padEdge(i,'RB'))){netSend({t:'arena',arena:(L.arena+1)%ARENAS.length});SFX.sel()}
   if(KP.KeyC||anyPad(i=>padEdge(i,'Y'))){netSend({t:'addcpu'});SFX.sel()}if(KP.Backspace||anyPad(i=>padEdge(i,'X'))){netSend({t:'delcpu'});SFX.sel()}
+  const MI=PDBCore.MODES.findIndex(x=>x.id==L.mode);if(KP.KeyM||anyPad(i=>padRep(i,'up'))){netSend({t:'rules',mode:PDBCore.MODES[(MI+1)%PDBCore.MODES.length].id});SFX.sel()}
+  if(KP.KeyI||anyPad(i=>padRep(i,'dn'))){netSend({t:'rules',items:((L.items|0)+1)%4});SFX.sel()}if(L.mode=='teams'&&(KP.KeyF||anyPad(i=>padEdge(i,'BK')))){netSend({t:'rules',ff:!L.ff});SFX.sel()}
   if(mStart()||anyPad(i=>padEdge(i,'A'))){netSend({t:'start'});SFX.ok()}}}
 function drawLobby(){const L=NET.lobby;if(!L){text(NET.ws&&NET.ws.readyState==1?'JOINING...':'CONNECTING...',W/2,130,'#ffffff',32,'center');bar([[['B'],'CANCEL']],[[['ESC'],'CANCEL']]);return}
  text(L.quick?'QUICK MATCH':'PRIVATE ROOM',W/2,26,PAL.Y,32,'center');if(!L.quick){panel(W/2-60,32,120,22);text('CODE: '+L.code,W/2,48,'#ffffff',16,'center')}acctBadge(4,4);
@@ -170,9 +172,9 @@ function drawLobby(){const L=NET.lobby;if(!L){text(NET.ws&&NET.ws.readyState==1?
   if(!s){text(L.quick?'SEARCHING':'EMPTY',x+55,y+60,'#8b93a6',16,'center');continue}
   text(s.name.slice(0,12),x+55,y+20,PCOL[i],s.name.length>6?8:16,'center');drawSheet(imgs[s.skin],x+39,y+28,1,2,Math.floor(t/7)%4,2);text(NAMES[s.skin],x+55,y+90,PAL.Y,16,'center');
   text(s.type=='cpu'?'CPU':i==L.you?'YOU':s.host?'HOST':'PLAYER',x+55,y+106,'#d8dde6',8,'center')}
- const A=ARENAS[L.arena];text(L.quick?'ARENA: RANDOM':'ARENA: \u2190 '+A.name+' \u2192',W/2,192,'#ffffff',16,'center');
- let st=L.count>=0?'STARTING IN '+L.count:L.quick?(L.fill>=0?'WAITING FOR PLAYERS... CPU FILL IN '+L.fill:'WAITING FOR PLAYERS...'):L.host?'START WHEN READY (2+ FIGHTERS)':'WAITING FOR HOST TO START';text(st,W/2,212,L.count>=0?PAL.Y:'#d8dde6',st.length>30?8:16,'center');
- if(L.host&&!L.quick){bar([[['DP'],'SKIN'],[['LB','RB'],'ARENA'],[['Y'],'CPU+'],[['X'],'CPU-'],[['A'],'START'],[['B'],'LEAVE']],[[['\u2190','\u2192'],'SKIN'],[['Q','E'],'ARENA'],[['C'],'CPU+'],[['BKSP'],'CPU-'],[['ENTER'],'START'],[['ESC'],'LEAVE']],242)}
+ const A=ARENAS[L.arena];text(L.quick?'ARENA: RANDOM':'ARENA: \u2190 '+A.name+' \u2192',W/2,188,'#ffffff',16,'center');text(rulesLine(L.quick?'stock':L.mode,L.quick?2:L.items,L.ff),W/2,201,'#ffffff',8,'center');
+ let st=L.count>=0?'STARTING IN '+L.count:L.quick?(L.fill>=0?'WAITING FOR PLAYERS... CPU FILL IN '+L.fill:'WAITING FOR PLAYERS...'):L.host?'START WHEN READY (2+ FIGHTERS)':'WAITING FOR HOST TO START';text(st,W/2,216,L.count>=0?PAL.Y:'#d8dde6',st.length>30?8:16,'center');
+ if(L.host&&!L.quick){bar([[['LB','RB'],'ARENA'],[['UP'],'MODE'],[['DN'],'ITEMS'],...(L.mode=='teams'?[[['BK'],'FF']]:[]),[['Y','X'],'CPU'],[['A'],'START']],[[['Q','E'],'ARENA'],[['M'],'MODE'],[['I'],'ITEMS'],...(L.mode=='teams'?[[['F'],'FF']]:[]),[['C','BKSP'],'CPU'],[['ENTER'],'START']],242)}
  else bar([[['DP'],'SKIN'],[['B'],'LEAVE']],[[['\u2190','\u2192'],'SKIN'],[['ESC'],'LEAVE']],242)}
 // ===== Shop =====
 const SH={sel:4,back:'menu',busy:false};
