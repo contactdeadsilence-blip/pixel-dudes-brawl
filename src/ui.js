@@ -5,7 +5,7 @@ function clearTok(){ACC.token=null;ACC.user=null;try{localStorage.removeItem('pd
 function api(path,body){return fetch('/api/'+path,{method:body?'POST':'GET',headers:Object.assign({'Content-Type':'application/json'},ACC.token?{Authorization:'Bearer '+ACC.token}:{}),body:body?JSON.stringify(body):undefined})
  .then(async r=>{let j={};try{j=await r.json()}catch(e){}if(!r.ok){const e=new Error((j.error||('HTTP '+r.status)).toUpperCase());e.status=r.status;throw e}return j})}
 function setUser(j){if(j.token){ACC.token=j.token;try{localStorage.removeItem('pdbToken');sessionStorage.removeItem('pdbToken');(REMEMBER?localStorage:sessionStorage).setItem('pdbToken',j.token)}catch(e){}}if(j.user)ACC.user=j.user;
- if(j.user&&j.user.settings&&Object.keys(j.user.settings).length&&j.fresh){Object.assign(SET,j.user.settings);try{localStorage.setItem('pdbSettings',JSON.stringify(SET))}catch(e){}loadKeys();applySet()}}
+ if(j.user&&j.user.settings&&Object.keys(j.user.settings).length&&j.fresh){Object.assign(SET,j.user.settings);if(!j.user.settings.cpuv){SET.diff=0;SET.cpuv=1}try{localStorage.setItem('pdbSettings',JSON.stringify(SET))}catch(e){}loadKeys();applySet()}}
 function logout(){if(ACC.token)api('logout',{}).catch(()=>{});clearTok();netClose()}
 function myUnlocks(){return ACC.user?ACC.user.unlocked:STARTER}
 const LOCKS=ONLINE;function owned(n){return !LOCKS||myUnlocks().includes(n)}
@@ -49,7 +49,7 @@ function setItems(){return [
  {l:'DISPLAY',v:()=>['PIXEL PERFECT','SMOOTH FIT'][SET.scale],ch:()=>SET.scale^=1},
  {l:'BUTTON PROMPTS',v:()=>['AUTO','XBOX','PLAYSTATION'][SET.prompts],ch:d=>SET.prompts=(SET.prompts+(d<0?2:1))%3},
  {l:'STICK DEADZONE',v:()=>Math.round(SET.dz*100)+'%',ch:d=>SET.dz=clamp(Math.round((SET.dz+d*.05)*100)/100,.1,.6)},
- {l:'CPU DIFFICULTY',v:()=>['EASY','NORMAL','HARD'][SET.diff],ch:d=>SET.diff=(SET.diff+d+3)%3},
+ {l:'CPU LEVEL',v:()=>['EASY','NORMAL','HARD'][SET.diff],ch:d=>SET.diff=(SET.diff+d+3)%3},
  {l:'STOCKS',v:()=>String(SET.stocks),ch:d=>SET.stocks=(SET.stocks-1+d+5)%5+1},
  {l:'MATCH TIMER',v:()=>SET.timer?SET.timer+' MIN':'OFF',ch:d=>{const o=[0,2,3,5,8];SET.timer=o[(o.indexOf(SET.timer)+d+o.length)%o.length]}},
  {l:'ITEMS',v:()=>PDBCore.ITEM_NAMES[SET.items|0],ch:d=>SET.items=((SET.items|0)+d+4)%4},
@@ -127,8 +127,8 @@ function netOpen(first){if(NET.ws&&NET.ws.readyState<=1){if(NET.ws.readyState==1
 function netClose(){if(NET.ws){const w=NET.ws;NET.ws=null;try{w.close()}catch(e){}}NET.lobby=null}
 function netLeave(){netSend({t:'leave'});NET.lobby=null;state='online';opause=false}
 function netMsg(m){if(m.t=='lobby'){NET.lobby=m;if(state=='online'||state=='joincode')state='lobby'}
- else if(m.t=='start'){NET.you=m.you;NET.names=m.slots.map(s=>s?s.name:'');CORE.startFight(m.slots,m.arena,{stocks:m.stocks,mode:m.mode||'stock',time:m.time||0,items:m.items|0,ff:!!m.ff});syncCore();arena=m.arena;parts=[];NET.snaps=[];NET.rt=-1;NET.lb=-1;NET.res=null;opause=false;state='ofight';camUpdate(true)}
- else if(m.t=='snap'){if(state!='ofight'&&!(state=='settings'&&ST.back=='ofight'))return;NET.snaps.push(m);if(NET.snaps.length>40)NET.snaps.shift();
+ else if(m.t=='start'){NET.you=m.you;NET.names=m.slots.map(s=>s?s.name:'');CORE.startFight(m.slots,m.arena,{stocks:m.stocks,mode:m.mode||'stock',time:m.time||0,items:m.items|0,ff:!!m.ff});syncCore();arena=m.arena;parts=[];NET.snaps=[];NET.rt=-1;NET.lt=0;NET.own=false;NET.X=null;NET.tm=0;NET.lb=-1;NET.res=null;opause=false;state='ofight';camUpdate(true)}
+ else if(m.t=='snap'){if(state!='ofight'&&!(state=='settings'&&ST.back=='ofight'))return;m.arr=performance.now();if(m.X)NET.X=m.X;if(m.timer!=null)NET.tm=m.timer;m.X=NET.X;m.timer=NET.tm;m.readyT=m.readyT|0;m.endT=m.endT|0;NET.snaps.push(m);if(NET.snaps.length>40)NET.snaps.shift();
   for(const e of m.ev||[]){if(e[0]=='s'){SFX[e[1]]&&SFX[e[1]](e[2])}else if(e[0]=='k')addShake(e[1]);else if(e[0]=='b')burst(e[1],e[2],e[3],e[4],e[5]);else if(e[0]=='o')koFx(e[2],e[3],e[1]);else if(e[0]=='p')partFx(e[1],e[2])}}
  else if(m.t=='end'){NET.res=m;chalToast(m.chal);if(ACC.user&&m.coins!=null)ACC.user.coins=m.coins;const r=m.rank.find(r=>r.i==NET.you);if(r&&r.coins)setTimeout(()=>SFX.coin(),900);if(state=='settings')state='oresult';else state='oresult';opause=false}
  else if(m.t=='user'){ACC.user=m.user}
@@ -141,13 +141,20 @@ function updOFight(){if(opause){pauseSel=listNav(3,pauseSel);if(KP.Escape||anyPa
  else if(KP.Escape||anyPad(i=>padEdge(i,'ST'))){opause=true;pauseSel=0;SFX.sel()}
  const o=opause?{}:netInput();let b=0,e=0;['l','r','u','d','a','s'].forEach((k,j)=>{if(o[k])b|=1<<j});['upE','dE','ap','sp'].forEach((k,j)=>{if(o[k])e|=1<<j});if(b!=NET.lb||e){netSend({t:'in',b,e});NET.lb=b}
  interp()}
-function interp(){const S=NET.snaps;if(!S.length)return;const newest=S[S.length-1].tick;
- if(NET.rt<0||Math.abs(newest-4-NET.rt)>12)NET.rt=newest-4;else{NET.rt+=1;if(NET.rt>newest-2)NET.rt=newest-2;if(NET.rt<newest-7)NET.rt+=1}
+// Playback clock in real time: render other fighters ~6 ticks (100ms) behind the newest estimated server tick, interpolating
+// between buffered snaps; drift is corrected gently instead of skipping. Own fighter: latest snap dead-reckoned + smoothed.
+const NDELAY=6;
+function interp(){const S=NET.snaps;if(!S.length)return;const now=performance.now(),L=S[S.length-1],est=L.tick+(now-L.arr)*.06,want=est-NDELAY;
+ const dt=NET.lt?Math.min(100,now-NET.lt):16.7;NET.lt=now;
+ if(NET.rt<0||Math.abs(want-NET.rt)>20)NET.rt=want;else{const err=want-NET.rt;NET.rt+=dt*.06*(1+clamp(err*.08,-.25,.25))}
+ if(NET.rt>L.tick)NET.rt=L.tick;
  while(S.length>3&&S[1].tick<NET.rt-6)S.shift();
  let a=S[0],c=S[S.length-1];for(let k=0;k<S.length-1;k++)if(S[k].tick<=NET.rt&&S[k+1].tick>=NET.rt){a=S[k];c=S[k+1];break}
- const al=c.tick>a.tick?clamp((NET.rt-a.tick)/(c.tick-a.tick),0,1):1,L=S[S.length-1];
+ const al=c.tick>a.tick?clamp((NET.rt-a.tick)/(c.tick-a.tick),0,1):1;
  F.forEach((f,k)=>{const fa=a.F[k],fc=c.F[k];if(!fa||!fc)return;
-  if(f.i==NET.you)CORE.unsnap(L.F[k],f);else{CORE.unsnap(al<.5?fa:fc,f);if(Math.abs(fa[0]-fc[0])<400&&Math.abs(fa[1]-fc[1])<400){f.x=(fa[0]+(fc[0]-fa[0])*al)/10;f.y=(fa[1]+(fc[1]-fa[1])*al)/10}}
+  if(f.i==NET.you){const px=f.x,py=f.y,had=NET.own;CORE.unsnap(L.F[k],f);const ex=Math.min(6,(now-L.arr)*.06+1),tx=f.x+f.vx*ex,ty=f.y+(f.ground?0:f.vy*ex);
+   if(had&&!f.out&&Math.abs(tx-px)<48&&Math.abs(ty-py)<48){f.x=px+(tx-px)*.5;f.y=py+(ty-py)*.5}else{f.x=tx;f.y=ty}NET.own=!f.out}
+  else{CORE.unsnap(al<.5?fa:fc,f);if(Math.abs(fa[0]-fc[0])<400&&Math.abs(fa[1]-fc[1])<400){f.x=(fa[0]+(fc[0]-fa[0])*al)/10;f.y=(fa[1]+(fc[1]-fa[1])*al)/10}}
   f.anim+=Math.abs(f.vx)*.1;if(f.dashT>0){f.trail.unshift([f.x,f.y]);if(f.trail.length>4)f.trail.pop()}else if(f.trail.length)f.trail.pop()});
  CORE.unsnapX(L.X);readyT=L.readyT;endT=L.endT;NET.timer=L.timer;camUpdate(false)}
 function updResult(){if(mOK()||mStart()){SFX.ok();state=NET.lobby?'lobby':'online'}else if(mBack()){SFX.back();netLeave()}}

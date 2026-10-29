@@ -70,16 +70,25 @@ function updF(f,inp){if(f.out)return;if(f.respawn>0){if(--f.respawn==0)spawn(f);
 function stageBounds(){let l=99,r=0,tp=99;map.forEach((row,y)=>row.forEach((c,x)=>{if(c!=' '){l=Math.min(l,x);r=Math.max(r,x);if(solidCh(c))tp=Math.min(tp,y)}}));stageL=l*T;stageR=(r+1)*T;stageTop=tp*T}
 function groundBelow(x,y){const tx=Math.floor(x/T);if(tx<0||tx>=map[0].length)return -1;for(let ty=Math.max(0,Math.floor(y/T));ty<map.length;ty++){if(map[ty][tx]!=' ')return ty}return -1}
 function safeX(cx,y,pref){if(pref){for(let d=0;d<16;d++){const x=cx+pref*d*T;if(groundBelow(x,y)>=0)return x+pref*T}}for(let d=0;d<50;d++)for(const s of [1,-1]){const x=cx+s*d*T;if(groundBelow(x,y)>=0)return x+s*T}return WW/2}
-function ai(f){const DF=[.45,1,1.7][opts.diff]||1;const o={l:0,r:0,u:0,d:0,upE:0,dE:0,ap:0,sp:0,xp:0};const A=f.ai;A.j--;
+// CPU levels: dl = reaction delay (ticks), df = aggression (scales attack/special/jump odds), aim = spacing error px,
+// idle = chance per tick to stand around briefly, rec = chance to use up-special recovery, sp = special-move multiplier.
+const CPU_LV=[{dl:24,df:.4,aim:18,idle:.012,rec:.35,sp:.3},{dl:12,df:.65,aim:10,idle:.004,rec:.75,sp:.6},{dl:0,df:1,aim:0,idle:0,rec:1,sp:1}];
+function ai(f){const P=CPU_LV[opts.diff]||CPU_LV[0],A=f.ai;if(!A.q)A.q=[];
+ if(A.idle>0){A.idle--;A.q.length=0;return {}}
+ if(P.idle&&f.ground&&f.hitstun<=0&&Math.random()<P.idle){A.idle=20+Math.floor(Math.random()*30);return {}}
+ if(P.aim&&!(A.errT>0)){A.err=(Math.random()*2-1)*P.aim;A.errT=40+Math.floor(Math.random()*50)}A.errT--;
+ const o=aiRaw(f,P);const off=!f.ground&&groundBelow(f.x+5,f.y+f.h)<0,dl=off?P.dl>>1:P.dl;
+ A.q.push(o);if(A.q.length>dl+1)A.q.splice(0,A.q.length-dl-1);return A.q.length>dl?A.q[0]:{}}
+function aiRaw(f,P){const DF=P.df;const o={l:0,r:0,u:0,d:0,upE:0,dE:0,ap:0,sp:0,xp:0};const A=f.ai;A.j--;
  const cx=f.x+5,feet=f.y+f.h;
  if(!f.ground&&groundBelow(cx,feet)<0){if(A.gapT>0)A.gapT--;const sx=safeX(cx,Math.max(0,f.y-48),A.gapT>0?A.gapDir:0),dir=sx>cx?1:-1;if(dir>0)o.r=1;else o.l=1;
-  if(f.vy>0.3&&f.jumps>0&&A.j<=0){o.upE=1;A.j=12}else if(f.jumps==0&&f.vy>0.5&&f.airDash&&f.dashCd<=0&&Math.abs(sx-cx)>24){f.face=dir;o.sp=1}else if(f.jumps==0&&f.vy>1&&!f.upUsed&&f.spCd<=0&&(f.dashCd>0||!f.airDash)&&opts.diff>0){o.u=1;o.xp=1}return o}
+  if(f.vy>0.3&&f.jumps>0&&A.j<=0){o.upE=1;A.j=12}else if(f.jumps==0&&f.vy>0.5&&f.airDash&&f.dashCd<=0&&Math.abs(sx-cx)>24){f.face=dir;o.sp=1}else if(f.jumps==0&&f.vy>1&&!f.upUsed&&f.spCd<=0&&(f.dashCd>0||!f.airDash)&&Math.random()<P.rec){o.u=1;o.xp=1}return o}
  for(const it of IT){const dx=it.x-f.x,dy=it.y-f.y;if(Math.abs(dx)<90&&Math.abs(dy)<24&&!(ITEM_KINDS[it.k]=='bomb'&&f.buf.bomb)){if(dx>4)o.r=1;else if(dx<-4)o.l=1;return o}}
  let tg=null,bd=1e9;for(const g of F){if(g==f||g.out||g.respawn>0||friendly(f,g)||(opts.teams&&g.team==f.team))continue;const d=Math.hypot(g.x-f.x,g.y-f.y);if(d<bd){bd=d;tg=g}}if(!tg)return o;
  {const P=(x,y)=>({x,y,w:10,h:20,dmg:0,vx:0,vy:0,ground:true,pseudo:1});
   if(opts.mode=='koth'&&HILL&&!ov(f,HILL)&&(bd>36||(f.i+(tick>>7))%3))tg=P(HILL.x+HILL.w/2-5,HILL.y+HILL.h-20);
   if(opts.mode=='coin'){let bc=null,cd=bd>40?320:90;for(const c of CO){const d=Math.hypot(c.x-f.x,c.y-f.y);if(d<cd){cd=d;bc=c}}if(bc)tg=P(bc.x-1,bc.y-12)}}
- const dx=tg.x-f.x,dy=tg.y-f.y,R=Math.random()/DF;if(opts.diff==0&&A.last&&Math.random()<.4)return A.last;A.last=o;
+ const dx=tg.x-f.x+(tg.pseudo?0:(A.err||0)),dy=tg.y-f.y,R=Math.random()/DF;
  if(Math.abs(dx)>12){if(dx>0)o.r=1;else o.l=1}
  if(f.ground&&(o.r||o.l)){const nx=cx+(o.r?14:-14);if(groundBelow(nx,feet)<0){if(tg.y+tg.h<=feet+8&&Math.abs(dx)<260&&A.j<=0&&groundBelow(cx+(o.r?1:-1)*Math.min(Math.abs(dx),150),feet-40)>=0){o.upE=1;A.j=25;A.gapDir=o.r?1:-1;A.gapT=50}else o.l=o.r=0}}
  if((o.r||o.l)&&solid(cx+(o.r?9:-9),f.y+10)){if(f.ground&&A.j<=0){o.upE=1;A.j=14;A.gapDir=o.r?1:-1;A.gapT=40}else if(!f.ground&&f.vy>0&&f.jumps>0&&A.j<=0){o.upE=1;A.j=14}}
@@ -89,7 +98,7 @@ function ai(f){const DF=[.45,1,1.7][opts.diff]||1;const o={l:0,r:0,u:0,d:0,upE:0
  if(f.buf.bomb&&Math.abs(dx)>30&&Math.abs(dx)<110&&Math.abs(dy)<30&&R<.08&&f.atkT<=0){f.face=dx>0?1:-1;o.ap=1}
  else if(Math.abs(dx)<22&&Math.abs(dy)<16&&R<.22&&tg.inv<=0){f.face=dx>0?1:-1;o.l=o.r=0;o.ap=1}
  else if(Math.abs(dx)>40&&Math.abs(dx)<120&&Math.abs(dy)<10&&f.dashCd<=0&&R<.03&&f.ground&&groundBelow(cx+(dx>0?60:-60),feet)>=0){f.face=dx>0?1:-1;o.sp=1}
- if(!o.ap&&!o.sp&&f.spCd<=0&&opts.diff>0){const ad=Math.abs(dx);if(ad<26&&Math.abs(dy)<14&&R<.05){f.face=dx>0?1:-1;o.xp=1;if(R<.025){o.d=1;o.l=o.r=0}}else if(ad>50&&ad<150&&Math.abs(dy)<10&&R<.015){f.face=dx>0?1:-1;o.l=o.r=0;o.xp=1}else if(dy>20&&ad<10&&!f.ground&&R<.1){o.d=1;o.xp=1}}
+ if(!o.ap&&!o.sp&&f.spCd<=0&&Math.random()<P.sp){const ad=Math.abs(dx);if(ad<26&&Math.abs(dy)<14&&R<.05){f.face=dx>0?1:-1;o.xp=1;if(R<.025){o.d=1;o.l=o.r=0}}else if(ad>50&&ad<150&&Math.abs(dy)<10&&R<.015){f.face=dx>0?1:-1;o.l=o.r=0;o.xp=1}else if(dy>20&&ad<10&&!f.ground&&R<.1){o.d=1;o.xp=1}}
  if(R>.995&&f.ground){o.upE=1}return o}
 function startFight(slots,ar,o){opts=Object.assign({stocks:3,diff:1,time:0,items:0,ff:true,mode:'stock'},o||{});if(!MODES.some(m=>m.id==opts.mode))opts.mode='stock';opts.teams=opts.mode=='teams';if(endless()&&!opts.time)opts.time=(opts.mode=='time'?120:180)*60;arena=ar;map=ARENAS[arena].map;WW=map[0].length*T;WH=map.length*T;stageBounds();F=[];
  slots.forEach((s,i)=>{if(!s||s.type=='none')return;const f={i,cpu:s.type=='cpu',skin:s.skin,name:s.name||'',x:0,y:0,w:10,h:20,vx:0,vy:0,face:i<2?1:-1,dmg:0,stocks:opts.stocks,out:false,respawn:0,inv:0,jumps:1,atkT:0,dashT:0,dashCd:0,airDash:true,hitstun:0,flash:0,dropT:0,ground:false,ff:false,hit:null,trail:[],anim:0,ai:{j:0},lastHit:null,buf:{spd:0,sh:0,ham:0,bomb:0},team:s.team!=null?s.team:i};spawn(f,true);F.push(f)});

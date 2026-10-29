@@ -72,16 +72,25 @@ function updF(f,inp){if(f.out)return;if(f.respawn>0){if(--f.respawn==0)spawn(f);
 function stageBounds(){let l=99,r=0,tp=99;map.forEach((row,y)=>row.forEach((c,x)=>{if(c!=' '){l=Math.min(l,x);r=Math.max(r,x);if(solidCh(c))tp=Math.min(tp,y)}}));stageL=l*T;stageR=(r+1)*T;stageTop=tp*T}
 function groundBelow(x,y){const tx=Math.floor(x/T);if(tx<0||tx>=map[0].length)return -1;for(let ty=Math.max(0,Math.floor(y/T));ty<map.length;ty++){if(map[ty][tx]!=' ')return ty}return -1}
 function safeX(cx,y,pref){if(pref){for(let d=0;d<16;d++){const x=cx+pref*d*T;if(groundBelow(x,y)>=0)return x+pref*T}}for(let d=0;d<50;d++)for(const s of [1,-1]){const x=cx+s*d*T;if(groundBelow(x,y)>=0)return x+s*T}return WW/2}
-function ai(f){const DF=[.45,1,1.7][opts.diff]||1;const o={l:0,r:0,u:0,d:0,upE:0,dE:0,ap:0,sp:0,xp:0};const A=f.ai;A.j--;
+// CPU levels: dl = reaction delay (ticks), df = aggression (scales attack/special/jump odds), aim = spacing error px,
+// idle = chance per tick to stand around briefly, rec = chance to use up-special recovery, sp = special-move multiplier.
+const CPU_LV=[{dl:24,df:.4,aim:18,idle:.012,rec:.35,sp:.3},{dl:12,df:.65,aim:10,idle:.004,rec:.75,sp:.6},{dl:0,df:1,aim:0,idle:0,rec:1,sp:1}];
+function ai(f){const P=CPU_LV[opts.diff]||CPU_LV[0],A=f.ai;if(!A.q)A.q=[];
+ if(A.idle>0){A.idle--;A.q.length=0;return {}}
+ if(P.idle&&f.ground&&f.hitstun<=0&&Math.random()<P.idle){A.idle=20+Math.floor(Math.random()*30);return {}}
+ if(P.aim&&!(A.errT>0)){A.err=(Math.random()*2-1)*P.aim;A.errT=40+Math.floor(Math.random()*50)}A.errT--;
+ const o=aiRaw(f,P);const off=!f.ground&&groundBelow(f.x+5,f.y+f.h)<0,dl=off?P.dl>>1:P.dl;
+ A.q.push(o);if(A.q.length>dl+1)A.q.splice(0,A.q.length-dl-1);return A.q.length>dl?A.q[0]:{}}
+function aiRaw(f,P){const DF=P.df;const o={l:0,r:0,u:0,d:0,upE:0,dE:0,ap:0,sp:0,xp:0};const A=f.ai;A.j--;
  const cx=f.x+5,feet=f.y+f.h;
  if(!f.ground&&groundBelow(cx,feet)<0){if(A.gapT>0)A.gapT--;const sx=safeX(cx,Math.max(0,f.y-48),A.gapT>0?A.gapDir:0),dir=sx>cx?1:-1;if(dir>0)o.r=1;else o.l=1;
-  if(f.vy>0.3&&f.jumps>0&&A.j<=0){o.upE=1;A.j=12}else if(f.jumps==0&&f.vy>0.5&&f.airDash&&f.dashCd<=0&&Math.abs(sx-cx)>24){f.face=dir;o.sp=1}else if(f.jumps==0&&f.vy>1&&!f.upUsed&&f.spCd<=0&&(f.dashCd>0||!f.airDash)&&opts.diff>0){o.u=1;o.xp=1}return o}
+  if(f.vy>0.3&&f.jumps>0&&A.j<=0){o.upE=1;A.j=12}else if(f.jumps==0&&f.vy>0.5&&f.airDash&&f.dashCd<=0&&Math.abs(sx-cx)>24){f.face=dir;o.sp=1}else if(f.jumps==0&&f.vy>1&&!f.upUsed&&f.spCd<=0&&(f.dashCd>0||!f.airDash)&&Math.random()<P.rec){o.u=1;o.xp=1}return o}
  for(const it of IT){const dx=it.x-f.x,dy=it.y-f.y;if(Math.abs(dx)<90&&Math.abs(dy)<24&&!(ITEM_KINDS[it.k]=='bomb'&&f.buf.bomb)){if(dx>4)o.r=1;else if(dx<-4)o.l=1;return o}}
  let tg=null,bd=1e9;for(const g of F){if(g==f||g.out||g.respawn>0||friendly(f,g)||(opts.teams&&g.team==f.team))continue;const d=Math.hypot(g.x-f.x,g.y-f.y);if(d<bd){bd=d;tg=g}}if(!tg)return o;
  {const P=(x,y)=>({x,y,w:10,h:20,dmg:0,vx:0,vy:0,ground:true,pseudo:1});
   if(opts.mode=='koth'&&HILL&&!ov(f,HILL)&&(bd>36||(f.i+(tick>>7))%3))tg=P(HILL.x+HILL.w/2-5,HILL.y+HILL.h-20);
   if(opts.mode=='coin'){let bc=null,cd=bd>40?320:90;for(const c of CO){const d=Math.hypot(c.x-f.x,c.y-f.y);if(d<cd){cd=d;bc=c}}if(bc)tg=P(bc.x-1,bc.y-12)}}
- const dx=tg.x-f.x,dy=tg.y-f.y,R=Math.random()/DF;if(opts.diff==0&&A.last&&Math.random()<.4)return A.last;A.last=o;
+ const dx=tg.x-f.x+(tg.pseudo?0:(A.err||0)),dy=tg.y-f.y,R=Math.random()/DF;
  if(Math.abs(dx)>12){if(dx>0)o.r=1;else o.l=1}
  if(f.ground&&(o.r||o.l)){const nx=cx+(o.r?14:-14);if(groundBelow(nx,feet)<0){if(tg.y+tg.h<=feet+8&&Math.abs(dx)<260&&A.j<=0&&groundBelow(cx+(o.r?1:-1)*Math.min(Math.abs(dx),150),feet-40)>=0){o.upE=1;A.j=25;A.gapDir=o.r?1:-1;A.gapT=50}else o.l=o.r=0}}
  if((o.r||o.l)&&solid(cx+(o.r?9:-9),f.y+10)){if(f.ground&&A.j<=0){o.upE=1;A.j=14;A.gapDir=o.r?1:-1;A.gapT=40}else if(!f.ground&&f.vy>0&&f.jumps>0&&A.j<=0){o.upE=1;A.j=14}}
@@ -91,7 +100,7 @@ function ai(f){const DF=[.45,1,1.7][opts.diff]||1;const o={l:0,r:0,u:0,d:0,upE:0
  if(f.buf.bomb&&Math.abs(dx)>30&&Math.abs(dx)<110&&Math.abs(dy)<30&&R<.08&&f.atkT<=0){f.face=dx>0?1:-1;o.ap=1}
  else if(Math.abs(dx)<22&&Math.abs(dy)<16&&R<.22&&tg.inv<=0){f.face=dx>0?1:-1;o.l=o.r=0;o.ap=1}
  else if(Math.abs(dx)>40&&Math.abs(dx)<120&&Math.abs(dy)<10&&f.dashCd<=0&&R<.03&&f.ground&&groundBelow(cx+(dx>0?60:-60),feet)>=0){f.face=dx>0?1:-1;o.sp=1}
- if(!o.ap&&!o.sp&&f.spCd<=0&&opts.diff>0){const ad=Math.abs(dx);if(ad<26&&Math.abs(dy)<14&&R<.05){f.face=dx>0?1:-1;o.xp=1;if(R<.025){o.d=1;o.l=o.r=0}}else if(ad>50&&ad<150&&Math.abs(dy)<10&&R<.015){f.face=dx>0?1:-1;o.l=o.r=0;o.xp=1}else if(dy>20&&ad<10&&!f.ground&&R<.1){o.d=1;o.xp=1}}
+ if(!o.ap&&!o.sp&&f.spCd<=0&&Math.random()<P.sp){const ad=Math.abs(dx);if(ad<26&&Math.abs(dy)<14&&R<.05){f.face=dx>0?1:-1;o.xp=1;if(R<.025){o.d=1;o.l=o.r=0}}else if(ad>50&&ad<150&&Math.abs(dy)<10&&R<.015){f.face=dx>0?1:-1;o.l=o.r=0;o.xp=1}else if(dy>20&&ad<10&&!f.ground&&R<.1){o.d=1;o.xp=1}}
  if(R>.995&&f.ground){o.upE=1}return o}
 function startFight(slots,ar,o){opts=Object.assign({stocks:3,diff:1,time:0,items:0,ff:true,mode:'stock'},o||{});if(!MODES.some(m=>m.id==opts.mode))opts.mode='stock';opts.teams=opts.mode=='teams';if(endless()&&!opts.time)opts.time=(opts.mode=='time'?120:180)*60;arena=ar;map=ARENAS[arena].map;WW=map[0].length*T;WH=map.length*T;stageBounds();F=[];
  slots.forEach((s,i)=>{if(!s||s.type=='none')return;const f={i,cpu:s.type=='cpu',skin:s.skin,name:s.name||'',x:0,y:0,w:10,h:20,vx:0,vy:0,face:i<2?1:-1,dmg:0,stocks:opts.stocks,out:false,respawn:0,inv:0,jumps:1,atkT:0,dashT:0,dashCd:0,airDash:true,hitstun:0,flash:0,dropT:0,ground:false,ff:false,hit:null,trail:[],anim:0,ai:{j:0},lastHit:null,buf:{spd:0,sh:0,ham:0,bomb:0},team:s.team!=null?s.team:i};spawn(f,true);F.push(f)});
@@ -333,8 +342,9 @@ function partFx(x,y){if(parts.length<PMAX)parts.push({x,y,vx:(Math.random()-.5)*
 function koFx(x,y,i){const bx=Math.max(cam.x+6,Math.min(cam.x+cam.vw-6,x)),by=Math.max(cam.y+6,Math.min(cam.y+cam.vw*H/W-6,y));burst(bx,by,PCOL[i],30,4);burst(bx,by,'#ffffff',20,3)}
 function syncCore(){F=CORE.F;map=CORE.map;WW=CORE.WW;WH=CORE.WH;readyT=CORE.readyT;endT=CORE.endT;winner=CORE.winner;hitstop=CORE.hitstop;arena=CORE.arena}
 // ===== Settings =====
-const DEF_SET={master:.8,music:.6,sfx:.8,mute:false,shake:0,fullscreen:false,fps:false,scale:0,prompts:0,dz:.35,diff:1,stocks:3,timer:0,items:2,mode:'stock',ff:false,keys:null};
+const DEF_SET={master:.8,music:.6,sfx:.8,mute:false,shake:0,fullscreen:false,fps:false,scale:0,prompts:0,dz:.35,diff:0,stocks:3,timer:0,items:2,mode:'stock',ff:false,keys:null};
 let SET=Object.assign({},DEF_SET);try{Object.assign(SET,JSON.parse(localStorage.getItem('pdbSettings')||'{}'));if(!localStorage.getItem('pdbSettings')&&localStorage.getItem('pdbShake')!=null)SET.shake=+localStorage.getItem('pdbShake')}catch(e){}
+if(!SET.cpuv){SET.cpuv=1;SET.diff=0;try{localStorage.setItem('pdbSettings',JSON.stringify(SET))}catch(e){}}// one-time: CPUs default to EASY
 function saveSet(){try{localStorage.setItem('pdbSettings',JSON.stringify(SET))}catch(e){}applySet();if(typeof onSetChange=='function')onSetChange()}
 function applySet(){DZ=SET.dz;auVol();applyScale()}
 const PSM=()=>SET.prompts?SET.prompts==2:lastPadPS;
@@ -523,7 +533,7 @@ function clearTok(){ACC.token=null;ACC.user=null;try{localStorage.removeItem('pd
 function api(path,body){return fetch('/api/'+path,{method:body?'POST':'GET',headers:Object.assign({'Content-Type':'application/json'},ACC.token?{Authorization:'Bearer '+ACC.token}:{}),body:body?JSON.stringify(body):undefined})
  .then(async r=>{let j={};try{j=await r.json()}catch(e){}if(!r.ok){const e=new Error((j.error||('HTTP '+r.status)).toUpperCase());e.status=r.status;throw e}return j})}
 function setUser(j){if(j.token){ACC.token=j.token;try{localStorage.removeItem('pdbToken');sessionStorage.removeItem('pdbToken');(REMEMBER?localStorage:sessionStorage).setItem('pdbToken',j.token)}catch(e){}}if(j.user)ACC.user=j.user;
- if(j.user&&j.user.settings&&Object.keys(j.user.settings).length&&j.fresh){Object.assign(SET,j.user.settings);try{localStorage.setItem('pdbSettings',JSON.stringify(SET))}catch(e){}loadKeys();applySet()}}
+ if(j.user&&j.user.settings&&Object.keys(j.user.settings).length&&j.fresh){Object.assign(SET,j.user.settings);if(!j.user.settings.cpuv){SET.diff=0;SET.cpuv=1}try{localStorage.setItem('pdbSettings',JSON.stringify(SET))}catch(e){}loadKeys();applySet()}}
 function logout(){if(ACC.token)api('logout',{}).catch(()=>{});clearTok();netClose()}
 function myUnlocks(){return ACC.user?ACC.user.unlocked:STARTER}
 const LOCKS=ONLINE;function owned(n){return !LOCKS||myUnlocks().includes(n)}
@@ -567,7 +577,7 @@ function setItems(){return [
  {l:'DISPLAY',v:()=>['PIXEL PERFECT','SMOOTH FIT'][SET.scale],ch:()=>SET.scale^=1},
  {l:'BUTTON PROMPTS',v:()=>['AUTO','XBOX','PLAYSTATION'][SET.prompts],ch:d=>SET.prompts=(SET.prompts+(d<0?2:1))%3},
  {l:'STICK DEADZONE',v:()=>Math.round(SET.dz*100)+'%',ch:d=>SET.dz=clamp(Math.round((SET.dz+d*.05)*100)/100,.1,.6)},
- {l:'CPU DIFFICULTY',v:()=>['EASY','NORMAL','HARD'][SET.diff],ch:d=>SET.diff=(SET.diff+d+3)%3},
+ {l:'CPU LEVEL',v:()=>['EASY','NORMAL','HARD'][SET.diff],ch:d=>SET.diff=(SET.diff+d+3)%3},
  {l:'STOCKS',v:()=>String(SET.stocks),ch:d=>SET.stocks=(SET.stocks-1+d+5)%5+1},
  {l:'MATCH TIMER',v:()=>SET.timer?SET.timer+' MIN':'OFF',ch:d=>{const o=[0,2,3,5,8];SET.timer=o[(o.indexOf(SET.timer)+d+o.length)%o.length]}},
  {l:'ITEMS',v:()=>PDBCore.ITEM_NAMES[SET.items|0],ch:d=>SET.items=((SET.items|0)+d+4)%4},
@@ -645,8 +655,8 @@ function netOpen(first){if(NET.ws&&NET.ws.readyState<=1){if(NET.ws.readyState==1
 function netClose(){if(NET.ws){const w=NET.ws;NET.ws=null;try{w.close()}catch(e){}}NET.lobby=null}
 function netLeave(){netSend({t:'leave'});NET.lobby=null;state='online';opause=false}
 function netMsg(m){if(m.t=='lobby'){NET.lobby=m;if(state=='online'||state=='joincode')state='lobby'}
- else if(m.t=='start'){NET.you=m.you;NET.names=m.slots.map(s=>s?s.name:'');CORE.startFight(m.slots,m.arena,{stocks:m.stocks,mode:m.mode||'stock',time:m.time||0,items:m.items|0,ff:!!m.ff});syncCore();arena=m.arena;parts=[];NET.snaps=[];NET.rt=-1;NET.lb=-1;NET.res=null;opause=false;state='ofight';camUpdate(true)}
- else if(m.t=='snap'){if(state!='ofight'&&!(state=='settings'&&ST.back=='ofight'))return;NET.snaps.push(m);if(NET.snaps.length>40)NET.snaps.shift();
+ else if(m.t=='start'){NET.you=m.you;NET.names=m.slots.map(s=>s?s.name:'');CORE.startFight(m.slots,m.arena,{stocks:m.stocks,mode:m.mode||'stock',time:m.time||0,items:m.items|0,ff:!!m.ff});syncCore();arena=m.arena;parts=[];NET.snaps=[];NET.rt=-1;NET.lt=0;NET.own=false;NET.X=null;NET.tm=0;NET.lb=-1;NET.res=null;opause=false;state='ofight';camUpdate(true)}
+ else if(m.t=='snap'){if(state!='ofight'&&!(state=='settings'&&ST.back=='ofight'))return;m.arr=performance.now();if(m.X)NET.X=m.X;if(m.timer!=null)NET.tm=m.timer;m.X=NET.X;m.timer=NET.tm;m.readyT=m.readyT|0;m.endT=m.endT|0;NET.snaps.push(m);if(NET.snaps.length>40)NET.snaps.shift();
   for(const e of m.ev||[]){if(e[0]=='s'){SFX[e[1]]&&SFX[e[1]](e[2])}else if(e[0]=='k')addShake(e[1]);else if(e[0]=='b')burst(e[1],e[2],e[3],e[4],e[5]);else if(e[0]=='o')koFx(e[2],e[3],e[1]);else if(e[0]=='p')partFx(e[1],e[2])}}
  else if(m.t=='end'){NET.res=m;chalToast(m.chal);if(ACC.user&&m.coins!=null)ACC.user.coins=m.coins;const r=m.rank.find(r=>r.i==NET.you);if(r&&r.coins)setTimeout(()=>SFX.coin(),900);if(state=='settings')state='oresult';else state='oresult';opause=false}
  else if(m.t=='user'){ACC.user=m.user}
@@ -659,13 +669,20 @@ function updOFight(){if(opause){pauseSel=listNav(3,pauseSel);if(KP.Escape||anyPa
  else if(KP.Escape||anyPad(i=>padEdge(i,'ST'))){opause=true;pauseSel=0;SFX.sel()}
  const o=opause?{}:netInput();let b=0,e=0;['l','r','u','d','a','s','x'].forEach((k,j)=>{if(o[k])b|=1<<j});['upE','dE','ap','sp','xp'].forEach((k,j)=>{if(o[k])e|=1<<j});if(b!=NET.lb||e){netSend({t:'in',b,e});NET.lb=b}
  interp()}
-function interp(){const S=NET.snaps;if(!S.length)return;const newest=S[S.length-1].tick;
- if(NET.rt<0||Math.abs(newest-4-NET.rt)>12)NET.rt=newest-4;else{NET.rt+=1;if(NET.rt>newest-2)NET.rt=newest-2;if(NET.rt<newest-7)NET.rt+=1}
+// Playback clock in real time: render other fighters ~6 ticks (100ms) behind the newest estimated server tick, interpolating
+// between buffered snaps; drift is corrected gently instead of skipping. Own fighter: latest snap dead-reckoned + smoothed.
+const NDELAY=6;
+function interp(){const S=NET.snaps;if(!S.length)return;const now=performance.now(),L=S[S.length-1],est=L.tick+(now-L.arr)*.06,want=est-NDELAY;
+ const dt=NET.lt?Math.min(100,now-NET.lt):16.7;NET.lt=now;
+ if(NET.rt<0||Math.abs(want-NET.rt)>20)NET.rt=want;else{const err=want-NET.rt;NET.rt+=dt*.06*(1+clamp(err*.08,-.25,.25))}
+ if(NET.rt>L.tick)NET.rt=L.tick;
  while(S.length>3&&S[1].tick<NET.rt-6)S.shift();
  let a=S[0],c=S[S.length-1];for(let k=0;k<S.length-1;k++)if(S[k].tick<=NET.rt&&S[k+1].tick>=NET.rt){a=S[k];c=S[k+1];break}
- const al=c.tick>a.tick?clamp((NET.rt-a.tick)/(c.tick-a.tick),0,1):1,L=S[S.length-1];
+ const al=c.tick>a.tick?clamp((NET.rt-a.tick)/(c.tick-a.tick),0,1):1;
  F.forEach((f,k)=>{const fa=a.F[k],fc=c.F[k];if(!fa||!fc)return;
-  if(f.i==NET.you)CORE.unsnap(L.F[k],f);else{CORE.unsnap(al<.5?fa:fc,f);if(Math.abs(fa[0]-fc[0])<400&&Math.abs(fa[1]-fc[1])<400){f.x=(fa[0]+(fc[0]-fa[0])*al)/10;f.y=(fa[1]+(fc[1]-fa[1])*al)/10}}
+  if(f.i==NET.you){const px=f.x,py=f.y,had=NET.own;CORE.unsnap(L.F[k],f);const ex=Math.min(6,(now-L.arr)*.06+1),tx=f.x+f.vx*ex,ty=f.y+(f.ground?0:f.vy*ex);
+   if(had&&!f.out&&Math.abs(tx-px)<48&&Math.abs(ty-py)<48){f.x=px+(tx-px)*.5;f.y=py+(ty-py)*.5}else{f.x=tx;f.y=ty}NET.own=!f.out}
+  else{CORE.unsnap(al<.5?fa:fc,f);if(Math.abs(fa[0]-fc[0])<400&&Math.abs(fa[1]-fc[1])<400){f.x=(fa[0]+(fc[0]-fa[0])*al)/10;f.y=(fa[1]+(fc[1]-fa[1])*al)/10}}
   f.anim+=Math.abs(f.vx)*.1;if(f.dashT>0){f.trail.unshift([f.x,f.y]);if(f.trail.length>4)f.trail.pop()}else if(f.trail.length)f.trail.pop()});
  CORE.unsnapX(L.X);readyT=L.readyT;endT=L.endT;NET.timer=L.timer;camUpdate(false)}
 function updResult(){if(mOK()||mStart()){SFX.ok();state=NET.lobby?'lobby':'online'}else if(mBack()){SFX.back();netLeave()}}

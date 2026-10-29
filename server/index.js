@@ -4,7 +4,7 @@ const path=require('path'),fs=require('fs'),http=require('http'),crypto=require(
 const express=require('express'),{WebSocketServer}=require('ws'),Database=require('better-sqlite3'),bcrypt=require('bcryptjs');
 const PDB=require('../shared/core.js');
 const PORT=+process.env.PORT||3000,DB_PATH=process.env.DB_PATH||path.join(__dirname,'..','data','brawl.db');
-const NS=PDB.PRICES.length,REWARD={part:25,ko:10,place:[50,25,10,0],firstWin:100,daily:50},LOCAL={part:10,ko:5,win:25,maxKo:9,maxMatch:60,minSec:process.env.LOCAL_MIN_SEC!=null?+process.env.LOCAL_MIN_SEC:30,dayCap:400,tickets:new Map()},ONLINE_RULES={stocks:3,time:(+process.env.MATCH_TIME_S||240)*60,diff:1,items:2};
+const NS=PDB.PRICES.length,REWARD={part:25,ko:10,place:[50,25,10,0],firstWin:100,daily:50},LOCAL={part:10,ko:5,win:25,maxKo:9,maxMatch:60,minSec:process.env.LOCAL_MIN_SEC!=null?+process.env.LOCAL_MIN_SEC:30,dayCap:400,tickets:new Map()},ONLINE_RULES={stocks:3,time:(+process.env.MATCH_TIME_S||240)*60,diff:0,items:2};
 const QUICK_FILL_MS=+process.env.QUICK_FILL_MS||15000,COUNTDOWN_MS=+process.env.COUNTDOWN_MS||5000;
 fs.mkdirSync(path.dirname(DB_PATH),{recursive:true});
 const db=new Database(DB_PATH);db.pragma('journal_mode = WAL');
@@ -138,7 +138,7 @@ function leave(ws){const r=ws.room;if(!r)return;ws.room=null;const i=r.slots.fin
  if(i>=0){if(r.state=='fight'){const s=r.slots[i];s.type='cpu';s.ws=null;s.name+=' (CPU)';r.core.setCPU(i,true)}else r.slots[i]=null}
  if(r.host===ws){const h=humans(r)[0];r.host=h?h.ws:null}
  if(!humans(r).length)return destroy(r);if(r.state=='lobby'){if(humans(r).length<2&&r.quick)r.countAt=0;pushLobby(r)}}
-function destroy(r){if(r.loop)clearInterval(r.loop);rooms.delete(r.code)}
+function destroy(r){if(r.loop)clearTimeout(r.loop);r.loop=null;rooms.delete(r.code)}
 const CPU_NAMES=['BOLT','ZIGGY','MOCHI','RUSTY','PIXIE','TANK'];
 function addCPU(r){const i=r.slots.findIndex(s=>!s);if(i<0)return;const used=r.slots.filter(Boolean).map(s=>s.skin);let sk;do{sk=Math.floor(Math.random()*NS)}while(used.includes(sk)&&used.length<NS);
  r.slots[i]={type:'cpu',name:'CPU',skin:sk,kos:0}}
@@ -149,12 +149,19 @@ function startMatch(r){r.state='fight';r.countAt=0;r.fillAt=0;if(r.quick)r.arena
   kill:(k,v)=>{if(k!=null&&k!==v&&r.slots[k])r.slots[k].kos++}});
  const slots=r.slots.map(s=>s?{type:s.type,skin:s.skin,name:s.name}:{type:'none'});r.core.startFight(slots,r.arena,Object.assign({},ONLINE_RULES,{mode:r.mode||'stock',items:r.items|0,ff:!!r.ff}));
  humans(r).forEach(s=>send(s.ws,{t:'start',you:r.slots.indexOf(s),slots:r.slots.map(s=>s?{type:s.type,skin:s.skin,name:s.name}:null),arena:r.arena,stocks:ONLINE_RULES.stocks,mode:r.core.opts.mode,time:r.core.opts.time,items:r.items|0,ff:!!r.ff}));
- r.loop=setInterval(()=>tickRoom(r),1000/60)}
+ startLoop(r)}
+// Fixed-step 60 Hz loop: setInterval(16.67) really fires every ~16ms (62.5 Hz) and drifts/bunches on a shared CPU, which made the
+// client playback clock fall behind and jump. Track real time with an accumulator, catch up at most 4 steps, then resync.
+const STEP_MS=1000/60;
+function startLoop(r){let next=performance.now();const run=()=>{if(r.loop!==h)return;const now=performance.now();let n=0;
+  while(now>=next&&n<4&&r.loop===h){tickRoom(r);next+=STEP_MS;n++}if(now-next>STEP_MS*4)next=now+STEP_MS;
+  if(r.loop===h){h=setTimeout(run,Math.max(0,next-performance.now()-1));r.loop=h}};let h=setTimeout(run,0);r.loop=h}
 const BITS=['l','r','u','d','a','s','x'],EB=['upE','dE','ap','sp','xp'];
 function tickRoom(r){const c=r.core;let res;try{res=c.step(i=>{const s=r.slots[i];if(!s||!s.inp)return {};const o={};BITS.forEach((k,j)=>o[k]=!!(s.inp.b&1<<j));EB.forEach((k,j)=>o[k]=!!(s.inp.e&1<<j));s.inp.e=0;return o})}catch(e){console.error('step',e);res='win'}
- if(c.tick%2==0||res){const m=JSON.stringify({t:'snap',tick:c.tick,F:c.snap(),X:c.snapX(),readyT:c.readyT,endT:c.endT,timer:c.timer,ev:r.ev.splice(0)});for(const s of humans(r))if(s.ws.readyState==1)s.ws.send(m)}
+ if(c.tick%2==0||res){const o={t:'snap',tick:c.tick,F:c.snap()},xs=JSON.stringify(c.snapX());if(xs!==r.lastX||c.tick-r.lastXT>=30||res){o.X=JSON.parse(xs);r.lastX=xs;r.lastXT=c.tick}
+  if(c.readyT)o.readyT=c.readyT;if(c.endT)o.endT=c.endT;if(c.timer!==r.lastTm||c.tick%60==0){o.timer=c.timer;r.lastTm=c.timer}if(r.ev.length)o.ev=r.ev.splice(0);const m=JSON.stringify(o);for(const s of humans(r))if(s.ws.readyState==1)s.ws.send(m)}
  if(res=='win')endMatch(r)}
-function endMatch(r){clearInterval(r.loop);r.loop=null;const c=r.core,w=c.winner;
+function endMatch(r){clearTimeout(r.loop);r.loop=null;const c=r.core,w=c.winner;
  const all=c.rank(),rank=all.map(f=>{const s=r.slots[f.i];let coins=0,bd=null;if(s&&s.type=='human'&&s.uid){const place=all.indexOf(f),won=w&&w.i==f.i;bd={part:REWARD.part,ko:REWARD.ko*Math.min(s.kos,9),place:w?REWARD.place[place]||0:0};coins=grant(s.uid,'online',bd.part+bd.ko+bd.place);if(won)coins+=(bd.firstWin=onceToday(s.uid,'firstwin',REWARD.firstWin))}let chal=null;if(s&&s.type=='human'&&s.uid&&s.ws){chal=chalProgress(s.uid,{won:!!(w&&w.i==f.i),kos:s.kos,online:true,flawless:!!(w&&w.i==f.i)&&f.stocks>=ONLINE_RULES.stocks,players:all.length,mode:r.mode||'stock'});s.chal=chal}return {i:f.i,name:s?s.name:'?',skin:f.skin,kos:s?s.kos:0,coins,bd}});
  if(r.quick){const rt=rateMatch(all.map((f,k)=>{const s=r.slots[f.i];return {uid:s&&s.type=='human'&&s.ws?s.uid:null,guest:s&&s.ws&&s.ws.user.guest,place:w?k:0,won:!!(w&&w.i==f.i)}}));rank.forEach(x=>{const s=r.slots[x.i];if(s&&s.uid&&rt[s.uid])x.rank=rt[s.uid]})}
  for(const s of humans(r)){const u=q.byId.get(s.uid);s.ws.user=u;send(s.ws,{t:'end',chal:s.chal||[],winner:w?w.i:null,rank,coins:u.coins});send(s.ws,{t:'user',user:pub(u)})}
@@ -166,7 +173,7 @@ setInterval(()=>{const now=Date.now();for(const r of rooms.values()){if(r.state!
   if(r.countAt&&now>=r.countAt){startMatch(r);continue}}
  pushLobby(r)}},500);
 
-const server=http.createServer(app);const wss=new WebSocketServer({server,path:'/ws',maxPayload:4096});
+const server=http.createServer(app);const wss=new WebSocketServer({server,path:'/ws',maxPayload:4096,perMessageDeflate:false});
 wss.on('connection',(ws,req)=>{const tok=new URL(req.url,'http://x').searchParams.get('token');const u=userOf(tok);
  if(!u){send(ws,{t:'err',m:'LOG IN FIRST',fatal:true});return ws.close()}ws.user=u;ws.room=null;WSU.set(u.id,(WSU.get(u.id)||0)+1);ws.on('close',()=>{WSU.set(u.id,Math.max(0,(WSU.get(u.id)||1)-1))});
  ws.on('message',d=>{let m;try{m=JSON.parse(d)}catch(e){return}if(!m||typeof m.t!='string')return;const r=ws.room;
