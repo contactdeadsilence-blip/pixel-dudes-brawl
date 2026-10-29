@@ -3,7 +3,7 @@
 const PDBP=require('../shared/core.js').PRICES;
 const path=require('path'),fs=require('fs'),os=require('os'),assert=require('assert');
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'pdb-'));
-Object.assign(process.env,{DB_PATH:path.join(tmp,'t.db'),MATCH_TIME_S:'12',QUICK_FILL_MS:'3000',COUNTDOWN_MS:'1000'});
+Object.assign(process.env,{DB_PATH:path.join(tmp,'t.db'),MATCH_TIME_S:'12',QUICK_FILL_MS:'3000',COUNTDOWN_MS:'1000',TOUR_GAP_MS:'300'});
 const {server,db}=require('../server/index.js');const WebSocket=require('ws');
 let B;const errors=[];process.on('uncaughtException',e=>{errors.push(e);console.error(e)});
 const api=(p,body,tok)=>fetch(B+'/api/'+p,{method:body?'POST':'GET',headers:Object.assign({'Content-Type':'application/json'},tok?{Authorization:'Bearer '+tok}:{}),body:body?JSON.stringify(body):undefined}).then(async r=>({status:r.status,j:await r.json()}));
@@ -68,5 +68,34 @@ const wait=(f,ms,what)=>new Promise((res,rej)=>{const t0=Date.now(),h=setInterva
  await new Promise(r=>setTimeout(r,2000));clearInterval(c2.bot);c2.ws.close();await new Promise(r=>setTimeout(r,500));
  const fl=c1.last.F[1][7];assert(fl&4,'disconnected player became CPU');console.log('disconnect -> CPU takeover OK');
  await wait(()=>c1.end,30000,'private end');console.log('private match ended, winner',c1.end.winner);
+ // --- bracket logic (pure)
+ const PC=require('../shared/core.js');for(const n of [4,8]){const b=PC.bracketNew(n);let x,k=0;assert.equal(PC.bracketReport(b,1,0,0),false,'cannot report unfilled match');
+  while(x=PC.bracketNext(b)){assert.equal(PC.bracketReport(b,x.r,x.m,99),false,'winner must be a player');assert(PC.bracketReport(b,x.r,x.m,Math.max(x.a,x.b)));assert.equal(PC.bracketReport(b,x.r,x.m,x.a),false,'no double report');k++}
+  assert.equal(k,n-1,'n-1 matches');assert.equal(PC.bracketChamp(b),n-1,'top winner advanced every round');assert.equal(PC.bracketRound(b,b.rd.length-1),'FINAL')}
+ assert.throws(()=>PC.bracketNew(6));console.log('bracket logic OK');
+ // --- 2v2: private room team picking, then 2V2 quick match with bot fill
+ r=await api('register',{username:'bob',password:'pw1234'});const Bt=r.j.token;const c3=client(Bt,'bob');await c3.open;
+ c1.start=c1.end=null;c1.lobby=null;c1.send({t:'create'});await wait(()=>c1.lobby&&!c1.lobby.quick,2000,'2v2 room');c1.send({t:'rules',mode:'teams'});
+ c3.send({t:'join',code:c1.lobby.code});await wait(()=>c3.lobby&&c3.lobby.slots.filter(Boolean).length==2,2000,'bob joined');
+ assert.notEqual(c3.lobby.slots[0].team,c3.lobby.slots[1].team,'auto-balanced teams');c3.send({t:'team'});await wait(()=>c1.lobby.slots[1]&&c1.lobby.slots[1].team===c1.lobby.slots[0].team,2000,'team switch');
+ c1.send({t:'addcpu'});c1.send({t:'addcpu'});await wait(()=>c1.lobby.slots.filter(Boolean).length==4,2000,'cpus');c3.send({t:'team'});await wait(()=>c3.msgs.some(m=>m.t=='err'&&m.m=='TEAM FULL'),2000,'team full');
+ c1.send({t:'start'});await wait(()=>c1.start&&c3.start,3000,'2v2 start');assert.equal(c1.start.mode,'teams');assert.equal(c1.start.teams[0],c1.start.teams[1],'picked teams used');assert.equal(c1.start.ff,false,'ff off by default');
+ await wait(()=>c1.end&&c3.end,30000,'2v2 end');console.log('private 2v2 with team picking OK, winner',c1.end.winner);
+ c1.send({t:'leave'});c3.send({t:'leave'});c1.start=c1.end=null;c1.send({t:'quick2'});await wait(()=>c1.start,8000,'2v2 quick start');
+ assert.equal(c1.start.slots.filter(Boolean).length,4);assert.equal(c1.start.mode,'teams');assert.equal(c1.start.slots.filter(s=>s&&s.type=='cpu').length,3);
+ const qr=[...require('../server/index.js').rooms.values()].find(x=>x.q2);assert(qr&&qr.core.opts.diff===0,'2v2 quick bots on EASY');
+ await wait(()=>c1.end,30000,'2v2 quick end');console.log('2V2 quick match with EASY bot fill OK');
+ // --- online tournament: 2 humans + 2 CPU fill, sequential 1v1s, spectators, champion reward + trophy
+ c1.send({t:'leave'});c1.lobby=c3.lobby=null;c1.send({t:'tcreate'});await wait(()=>c1.lobby&&c1.lobby.tour,2000,'tour room');assert.equal(c1.lobby.slots.length,8);
+ c3.send({t:'join',code:c1.lobby.code});await wait(()=>c3.lobby&&c3.lobby.tour,2000,'tour join');c1.send({t:'rules',tsize:4});
+ const tc=c=>c.msgs.find(m=>m.t=='tchamp');c1.send({t:'start'});await wait(()=>tc(c1)&&tc(c3),150000,'tournament champion');
+ const ch=tc(c1),starts=[...c1.msgs,...c3.msgs].filter(m=>m.t=='start'&&m.tour);assert(starts.length>=2,'human matches ran');assert(starts.every(m=>m.slots.filter(Boolean).length==2),'1v1 matches');
+ assert(starts.some(m=>m.spec),'spectator saw a match');assert([...c1.msgs,...c3.msgs].some(m=>m.t=='lobby'&&m.T),'bracket broadcast');
+ const champ=[c1,c3].find(c=>tc(c).you);if(champ){const u=(await api('me',null,champ===c1?A:Bt)).j.user;assert.equal(u.trophies,1,'trophy');assert.equal(tc(champ).coins,100)}
+ console.log('online tournament OK, champion',ch.name,champ?'(human, trophy + coins)':'(CPU)');
+ // --- local tournament reward endpoint (capped like local)
+ let tk=(await api('local/start',{},Bt)).j.ticket;r=await api('local/tourney',{ticket:tk,size:4,won:true},Bt);assert.equal(r.status,200);assert(r.j.coins<=40);
+ r=await api('local/tourney',{ticket:tk,size:4,won:true},Bt);assert.equal(r.status,400,'ticket single use');console.log('local tournament reward OK',r.status);
+ clearInterval(c3.bot);c3.ws.close();
  clearInterval(c1.bot);c1.ws.close();assert.equal(errors.length,0);console.log('ALL TESTS PASSED');process.exit(0)
 })().catch(e=>{console.error('FAIL',e);process.exit(1)});

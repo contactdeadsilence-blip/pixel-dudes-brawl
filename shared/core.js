@@ -26,6 +26,15 @@ const COS_BY=Object.fromEntries(COSMETICS.map(c=>[c.id,c]));
 // parse a stored cosm JSON into {own:[ids],eq:{cat:id}}, dropping anything unknown or not owned
 function cosParse(j){let o;try{o=typeof j=='string'?JSON.parse(j||'{}'):(j||{})}catch(e){o={}}const own=Array.isArray(o.own)?o.own.filter(id=>COS_BY[id]):[];const eq={};
  if(o.eq&&typeof o.eq=='object')for(const c of COS_CATS){const id=o.eq[c];if(id&&COS_BY[id]&&COS_BY[id].cat==c&&own.includes(id))eq[c]=id}return {own,eq}}
+// ===== Single-elimination tournament bracket (pure; shared by client + server) =====
+// b={size,ent:[entrant ids...],rd:[[{a,b,w}...]...]}; entrants are indices into ent; w = winning entrant index
+function bracketNew(n){if(n!==4&&n!==8)throw new Error('bracket size must be 4 or 8');const rd=[];const s0=n==8?[0,7,3,4,1,6,2,5]:[0,3,1,2];
+ rd.push([]);for(let k=0;k<n;k+=2)rd[0].push({a:s0[k],b:s0[k+1],w:null});for(let m=n/4;m>=1;m/=2)rd.push(Array.from({length:m},()=>({a:null,b:null,w:null})));return {size:n,rd}}
+function bracketNext(b){for(let r=0;r<b.rd.length;r++)for(let m=0;m<b.rd[r].length;m++){const x=b.rd[r][m];if(x.w==null&&x.a!=null&&x.b!=null)return {r,m,a:x.a,b:x.b}}return null}
+function bracketReport(b,r,m,w){const x=b.rd[r]&&b.rd[r][m];if(!x||x.w!=null||x.a==null||x.b==null)return false;if(w!==x.a&&w!==x.b)return false;x.w=w;
+ const nx=b.rd[r+1];if(nx){const y=nx[m>>1];if(m&1)y.b=w;else y.a=w}return true}
+function bracketChamp(b){const f=b.rd[b.rd.length-1][0];return f.w}
+function bracketRound(b,r){const n=b.rd.length-1-r;return n==0?'FINAL':n==1?'SEMIS':'QUARTERS'}
 function tierOf(r){let t=TIERS[0];for(const x of TIERS)if(r>=x[1])t=x;return t[0]}
 function createCore(H){H=H||{};
 const W=480,T=16;const PCOL=['#e04848','#4a8fe0','#fee761','#a1e55a'];
@@ -117,7 +126,7 @@ function aiRaw(f,P){const DF=P.df;const o={l:0,r:0,u:0,d:0,upE:0,dE:0,ap:0,sp:0,
  if(R>.995&&f.ground){o.upE=1}return o}
 function startFight(slots,ar,o){opts=Object.assign({stocks:3,diff:1,time:0,items:0,ff:true,mode:'stock'},o||{});if(!MODES.some(m=>m.id==opts.mode))opts.mode='stock';opts.teams=opts.mode=='teams';if(endless()&&!opts.time)opts.time=(opts.mode=='time'?120:180)*60;arena=ar;map=ARENAS[arena].map;WW=map[0].length*T;WH=map.length*T;stageBounds();F=[];
  slots.forEach((s,i)=>{if(!s||s.type=='none')return;const f={i,cpu:s.type=='cpu',skin:s.skin,name:s.name||'',x:0,y:0,w:10,h:20,vx:0,vy:0,face:i<2?1:-1,dmg:0,stocks:opts.stocks,out:false,respawn:0,inv:0,jumps:1,atkT:0,dashT:0,dashCd:0,airDash:true,hitstun:0,flash:0,dropT:0,ground:false,ff:false,hit:null,trail:[],anim:0,ai:{j:0},lastHit:null,buf:{spd:0,sh:0,ham:0,bomb:0},team:s.team!=null?s.team:i};spawn(f,true);F.push(f)});
- readyT=100;endT=0;winner=null;hitstop=0;timer=opts.time||0;tick=0;pickHill();hillT=1200;CO=[];coinT=60;F.forEach(f=>{f.pts=0;if(opts.teams)f.team=f.i%2});IT=[];PR=[];itemT=Math.round((ITEM_INT[opts.items|0]||0)*.5)}
+ readyT=100;endT=0;winner=null;hitstop=0;timer=opts.time||0;tick=0;pickHill();hillT=1200;CO=[];coinT=60;F.forEach(f=>{f.pts=0;if(opts.teams)f.team=Array.isArray(opts.teamOf)&&opts.teamOf[f.i]!=null?opts.teamOf[f.i]&1:f.i%2});IT=[];PR=[];itemT=Math.round((ITEM_INT[opts.items|0]||0)*.5)}
 function friendly(a,b){return opts.teams&&!opts.ff&&a.team==b.team}
 // ===== Items: periodic stage drops, simulated here so the server is authoritative online =====
 function spawnItem(){if(IT.length>=3)return;for(let n=0;n<24;n++){const x=stageL+8+rnd()*(stageR-stageL-26);if(groundBelow(x+5,0)<0||groundBelow(x+15,0)<0)continue;
@@ -164,6 +173,6 @@ function unsnap(a,f){f.x=a[0]/10;f.y=a[1]/10;f.vx=a[2]/10;f.vy=a[3]/10;f.face=a[
 return{ARENAS,T,PCOL,startFight,step,hitbox,onGround,snap,unsnap,snapX,unsnapX,rank,ITEM_KINDS,get items(){return IT},get hill(){return HILL},get coins(){return CO},get hillT(){return hillT},score,MODES,KOTH_GOAL,COIN_GOAL,get projs(){return PR},
  get F(){return F},get map(){return map},get arena(){return arena},get WW(){return WW},get WH(){return WH},get readyT(){return readyT},get endT(){return endT},get winner(){return winner},get hitstop(){return hitstop},get timer(){return timer},get tick(){return tick},get opts(){return opts},
  setCPU(i,v){const f=F.find(f=>f.i==i);if(f)f.cpu=v}}}
-const api={createCore,PRICES,STARTER,TIERS,tierOf,CHALLENGES,chalAdd,ITEM_KINDS,ITEM_NAMES,MODES,COSMETICS,COS_CATS,COS_BY,cosParse};
+const api={createCore,PRICES,STARTER,TIERS,tierOf,CHALLENGES,chalAdd,ITEM_KINDS,ITEM_NAMES,MODES,COSMETICS,COS_CATS,COS_BY,cosParse,get ARENAS_N(){return this._an||(this._an=createCore({}).ARENAS.length)},bracketNew,bracketNext,bracketReport,bracketChamp,bracketRound};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.PDBCore=api;
 })(typeof window!=='undefined'?window:globalThis);

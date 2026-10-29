@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS once_day(user_id INTEGER,day TEXT,kind TEXT,PRIMARY K
 CREATE TABLE IF NOT EXISTS chal(user_id INTEGER,day TEXT,slot INTEGER,cid TEXT,prog INTEGER DEFAULT 0,done INTEGER DEFAULT 0,PRIMARY KEY(user_id,day,slot));
 CREATE TABLE IF NOT EXISTS friends(a INTEGER,b INTEGER,status INTEGER DEFAULT 0,created BIGINT,PRIMARY KEY(a,b));
 ALTER TABLE users ADD COLUMN IF NOT EXISTS cosm TEXT DEFAULT '{}';
-ALTER TABLE purchases ADD COLUMN IF NOT EXISTS item TEXT;`;
+ALTER TABLE purchases ADD COLUMN IF NOT EXISTS item TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS trophies INTEGER DEFAULT 0;`;
 const SCHEMA_SQLITE=`CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,username TEXT UNIQUE COLLATE NOCASE,pass TEXT,coins INTEGER DEFAULT 0,unlocked TEXT,settings TEXT DEFAULT '{}',guest INTEGER DEFAULT 0,created INTEGER);
 CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,user_id INTEGER,created INTEGER);
 CREATE TABLE IF NOT EXISTS purchases(id INTEGER PRIMARY KEY,user_id INTEGER,skin INTEGER,price INTEGER,ts INTEGER);
@@ -39,7 +40,7 @@ function makeSqlite(file){
  const db=new Database(file);db.pragma('journal_mode = WAL');const cache=new Map();
  const st=s=>{let x=cache.get(s);if(!x){x=db.prepare(s);cache.set(s,x)}return x};
  return {kind:'sqlite',raw:db,
-  async init(){db.exec(SCHEMA_SQLITE);for(const c of ['rating INTEGER DEFAULT 1000','games INTEGER DEFAULT 0','wins INTEGER DEFAULT 0',"cosm TEXT DEFAULT '{}'"])try{db.exec('ALTER TABLE users ADD COLUMN '+c)}catch(e){}try{db.exec('ALTER TABLE purchases ADD COLUMN item TEXT')}catch(e){}},
+  async init(){db.exec(SCHEMA_SQLITE);for(const c of ['rating INTEGER DEFAULT 1000','games INTEGER DEFAULT 0','wins INTEGER DEFAULT 0',"cosm TEXT DEFAULT '{}'",'trophies INTEGER DEFAULT 0'])try{db.exec('ALTER TABLE users ADD COLUMN '+c)}catch(e){}try{db.exec('ALTER TABLE purchases ADD COLUMN item TEXT')}catch(e){}},
   async get(s,p=[]){return st(s).get(...p)},
   async all(s,p=[]){return st(s).all(...p)},
   async run(s,p=[]){const r=st(s).run(...p);return {changes:r.changes}},
