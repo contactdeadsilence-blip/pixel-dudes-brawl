@@ -79,7 +79,7 @@ function drawSettings(){text('SETTINGS',W/2,26,PAL.Y,32,'center');panel(30,34,42
  if(ST.sel>=10&&ST.sel<=13)text('CPU / STOCKS / TIMER / ITEMS APPLY TO LOCAL MATCHES',W/2,232,'#d8dde6',8,'center');
  bar([[['DP'],'CHANGE'],[['A'],'OK'],[['B'],'BACK']],[[['\u2191','\u2193','\u2190','\u2192'],'CHANGE'],[['ENTER'],'OK'],[['ESC'],'BACK']])}
 // ===== Login / register =====
-const LG={sel:0,user:'',pass:'',msg:'',busy:false,after:'online'};let OSK=null;
+const LG={show:false,sel:0,user:'',pass:'',msg:'',busy:false,after:'online'};let OSK=null;
 function openLogin(after){LG.after=after;LG.sel=0;LG.msg='';state='login'}
 const LG_ITEMS=['USERNAME','PASSWORD','REMEMBER ME','LOG IN','REGISTER','PLAY AS GUEST','BACK'];
 function typeKey(ch){if(state=='login'&&LG.sel<2&&!LG.busy){const k=LG.sel?'pass':'user';if(ch=='\b')LG[k]=LG[k].slice(0,-1);else if(LG[k].length<(LG.sel?32:12)&&(LG.sel||/[A-Za-z0-9_]/.test(ch)))LG[k]+=LG.sel?ch:ch.toUpperCase();return true}
@@ -91,12 +91,13 @@ function updOSK(){const C='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_',n=C.length+2;i
  if(anyPad(i=>padEdge(i,'A'))||KP.Enter){if(OSK.i<C.length){typeKey(LG.sel?C[OSK.i].toLowerCase():C[OSK.i]);SFX.sel()}else if(OSK.i==C.length){typeKey('\b');SFX.back()}else{OSK=null;SFX.ok()}}
  else if(anyPad(i=>padEdge(i,'X'))){typeKey('\b');SFX.back()}else if(mBack()||anyPad(i=>padEdge(i,'ST'))){OSK=null;SFX.ok()}}
 function updLogin(){if(OSK){updOSK();return}if(KP.Tab)LG.sel=(LG.sel+1)%LG_ITEMS.length;LG.sel=listNav(LG_ITEMS.length,LG.sel);
+if(LG.sel==1&&(mR()||mL()||anyPad(i=>padEdge(i,'Y')))){LG.show=!LG.show;SFX.sel()}
  if(mBack()){state='menu';SFX.back();return}
  if(LG.sel<2&&anyPad(i=>padEdge(i,'A'))){OSK={i:0};SFX.ok();return}
  if(mOK()){if(LG.sel<2){LG.sel++;SFX.sel()}else if(LG.sel==2){REMEMBER=!REMEMBER;try{localStorage.setItem('pdbRemember',REMEMBER?'1':'0')}catch(e){}SFX.sel()}else if(LG.sel==3)authDo('login');else if(LG.sel==4)authDo('register');else if(LG.sel==5)authDo('guest');else{state='menu';SFX.back()}}}
 function drawLogin(){text('ONLINE ACCOUNT',W/2,28,PAL.Y,32,'center');panel(90,38,300,182);
  LG_ITEMS.forEach((l,k)=>{const y=k<2?62+k*34:134+(k-2)*15;const on=k==LG.sel;
-  if(k<2){text(l,104,y,on?PAL.Y:'#d8dde6',8);panel(104,y+3,272,18,on?'#5d4a6e':'#3b3f52');const v=k?'*'.repeat(LG.pass.length):LG.user;text(v+(on&&Math.floor(t/20)%2?'_':''),110,y+17,'#ffffff',16)}
+  if(k<2){text(l,104,y,on?PAL.Y:'#d8dde6',8);panel(104,y+3,272,18,on?'#5d4a6e':'#3b3f52');if(k&&!LG.show){ctx.fillStyle='#ffffff';const n=Math.min(LG.pass.length,30);for(let d=0;d<n;d++)ctx.fillRect(111+d*8,y+9,5,5);if(on&&Math.floor(t/20)%2)text('_',111+n*8,y+17,'#ffffff',16)}else{const v=k?LG.pass:LG.user;text(v+(on&&Math.floor(t/20)%2?'_':''),110,y+17,'#ffffff',16)}if(k)text((LG.show?'HIDE':'SHOW')+' \u2190\u2192',376,y,on?PAL.Y:'#8b93a6',8,'right')}
   else{if(on){ctx.fillStyle='#5d4a6e';ctx.fillRect(140,y-12,200,15)}const L=k==2?l+': '+(REMEMBER?'ON':'OFF'):l;text(on?'\u2192 '+L+' \u2190':L,W/2,y,on?PAL.Y:'#ffffff',16,'center')}});
  if(LG.msg)text(LG.msg,W/2,214,LG.msg=='...'?'#d8dde6':'#f99252',8,'center');
  if(OSK){const C='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_'.split('').concat(['DEL','OK']);panel(60,118,360,92,'#3b3f52');C.forEach((c,k)=>{const x=72+(k%10)*34,y=136+Math.floor(k/10)*18;if(k==OSK.i){ctx.fillStyle='#5d4a6e';ctx.fillRect(x-6,y-13,30,17)}text(c,x+9,y,k==OSK.i?PAL.Y:'#ffffff',c.length>1?8:16,'center')})}
