@@ -1,6 +1,6 @@
 const cv=document.getElementById('c');let ctx=cv.getContext('2d');ctx.imageSmoothingEnabled=false;
 const W=480,H=270,T=16,FW=16,FH=24;let camX=0,t=0;
-const NAMES=["GECKO","GRAPE","ROSE","LEMON","PUMPKIN","SUNNY","SWAMPY","CHOMPY","LEAFY","SKULLY","HORNS","VIKING","TOPHAT","GINGER","SPROUT","IMP","PIRATE","GRUMPY","PEACH","BANANA","NINJA","ROBO","ZOMBIE","WIZARD","ASTRO","KNIGHT","COWBOY","ALIEN","CHEF","GHOST","FROSTY","LAVA","PANDA","GARFIELD"];const NS=NAMES.length,GC=12;
+const NAMES=["GECKO","GRAPE","ROSE","LEMON","PUMPKIN","SUNNY","SWAMPY","CHOMPY","LEAFY","SKULLY","HORNS","VIKING","TOPHAT","GINGER","SPROUT","IMP","PIRATE","GRUMPY","PEACH","BANANA","NINJA","ROBO","ZOMBIE","WIZARD","ASTRO","KNIGHT","COWBOY","ALIEN","CHEF","GHOST","FROSTY","LAVA","PANDA","GARFIELD","MARSHMALLOW","MOCHI"];const NS=NAMES.length,GC=12;
 const imgs=SKINS.map(s=>{const i=new Image();i.src=s;return i});let whites=[];
 const PCOL=['#e04848','#4a8fe0','#fee761','#a1e55a'];
 let AC=null;function snd(f1,f2,d,type='square',v=.12){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();const o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.setValueAtTime(f1,AC.currentTime);o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),AC.currentTime+d);g.gain.setValueAtTime(v,AC.currentTime);g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+d);o.connect(g);g.connect(AC.destination);o.start();o.stop(AC.currentTime+d)}catch(e){}}
