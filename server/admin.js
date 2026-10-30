@@ -46,5 +46,11 @@ module.exports=function mount(app,ctx){const {db,PDB,send}=ctx;const W=()=>ctx.w
  A.get('/props',H(async(req,res)=>res.json({props:await db.all('SELECT id,name,w,h,enabled FROM props ORDER BY id',[])})));
  A.post('/prop/toggle',H(async(req,res)=>{const b=req.body||{};await db.run('UPDATE props SET enabled=? WHERE id=?',[b.on?1:0,+b.id|0]);res.json({ok:true})}));
  A.post('/prop/delete',H(async(req,res)=>{await db.run('DELETE FROM props WHERE id=?',[+(req.body||{}).id|0]);res.json({ok:true})}));
+ // grant every skin + every cosmetic (all categories, incl. weapons and arena themes); keeps existing equips
+ A.post('/unlock-all',H(async(req,res)=>{const n=String((req.body||{}).username||'').trim();if(!n)return res.status(400).json({error:'username required'});
+  const u=await db.get('SELECT id,cosm FROM users WHERE lower(username)=lower(?)',[n]);if(!u)return res.status(404).json({error:'no such user'});
+  const c=PDB.cosParse(u.cosm);c.own=PDB.COSMETICS.map(x=>x.id);const skins=PDB.PRICES.map((_,i)=>i);
+  await db.run('UPDATE users SET unlocked=?,cosm=? WHERE id=?',[JSON.stringify(skins),JSON.stringify(c),u.id]);
+  res.json({ok:true,username:n,skins:skins.length,items:c.own.length})}));
  app.use('/api/admin',A);
 };

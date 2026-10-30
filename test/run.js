@@ -59,6 +59,9 @@ const wait=(f,ms,what)=>new Promise((res,rej)=>{const t0=Date.now(),h=setInterva
   r=await adm('prop',{name:'crate',png:png(16,16).toString('base64')},AK);assert.equal(r.status,200);const pid=r.j.props[0].id;
   assert.equal((await adm('prop',{name:'big',png:png(200,10).toString('base64')},AK)).status,400,'oversize png');
   const img=await fetch(B+'/api/props/'+pid+'.png');assert.equal(img.headers.get('content-type'),'image/png');
+  assert.equal((await adm('unlock-all',{username:'unlockme'})).status,401);assert.equal((await adm('unlock-all',{username:'nobody_x'},AK)).status,404);
+  const UT=(await api('register',{username:'unlockme',password:'pw1234'})).j.token;r=await adm('unlock-all',{username:'UNLOCKME'},AK);assert.equal(r.status,200);r=await api('me',null,UT);assert.equal(r.j.user.unlocked.length,PDBP.length);
+  assert.equal(r.j.user.cosm.own.length,require('../shared/core.js').COSMETICS.length);assert(r.j.user.cosm.own.includes('wp_beam')&&r.j.user.cosm.own.includes('ar_volcano'));
   r=await adm('stats',null,AK);assert.equal(r.status,200);assert.equal(r.j.maint,false);console.log('admin API OK (key required, price override enforced, png prop stored)')}
 // --- cosmetics: validation, buy, equip
  const CB=require('../shared/core.js').COS_BY;
