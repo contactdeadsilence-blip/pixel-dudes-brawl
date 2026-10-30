@@ -1,0 +1,27 @@
+{
+  "name": "pixel-dudes-brawl-desktop",
+  "productName": "Pixel Dudes Brawl",
+  "version": "1.0.0",
+  "description": "Pixel Dudes Brawl desktop launcher",
+  "author": "DeadSilenceStudio <contact.deadsilence@gmail.com>",
+  "main": "main.js",
+  "scripts": {
+    "copy-offline": "node -e \"require('fs').mkdirSync('offline',{recursive:true});require('fs').copyFileSync('../public/index.html','offline/index.html')\"",
+    "start": "npm run copy-offline && electron .",
+    "dist": "npm run copy-offline && electron-builder",
+    "release": "npm run copy-offline && electron-builder --publish always"
+  },
+  "dependencies": { "electron-updater": "^6.3.9" },
+  "devDependencies": { "electron": "^33.2.0", "electron-builder": "^25.1.8" },
+  "build": {
+    "appId": "com.deadsilencestudio.pixeldudesbrawl",
+    "productName": "Pixel Dudes Brawl",
+    "files": ["main.js", "offline/**", "build/icon.png"],
+    "directories": { "buildResources": "build", "output": "dist" },
+    "publish": [{ "provider": "github", "owner": "contactdeadsilence-blip", "repo": "pixel-dudes-brawl" }],
+    "win": { "target": "nsis", "icon": "build/icon.png" },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true },
+    "mac": { "target": "dmg", "icon": "build/icon.png", "category": "public.app-category.games" },
+    "linux": { "target": "AppImage", "icon": "build/icon.png", "category": "Game" }
+  }
+}
