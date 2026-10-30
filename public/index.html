@@ -1002,6 +1002,20 @@ function wpAng(atkT){if(!(atkT>0))return 1.3;if(atkT>14)return 1.1-(20-atkT)*.03
 function drawWeapon(id,hx,hy,face,ang,sc=1){const im=wpImg(id);if(!im)return;ctx.save();ctx.translate(Math.round(hx),Math.round(hy));ctx.scale(face<0?-sc:sc,sc);ctx.rotate(ang);
  if(id=='wp_beam'){ctx.globalAlpha=.35;ctx.fillStyle='#5fcde4';ctx.fillRect(-im.width/2-1,-im.height,im.width+2,im.height-3);ctx.globalAlpha=1}
  ctx.drawImage(im,-Math.floor(im.width/2),-im.height+2);ctx.restore()}
+// ===== attachment anchoring: hats/weapons follow the exact body frame that was just drawn =====
+// Every skin-sheet draw records where/how the body sprite went (rounded origin, facing, row, frame, scale).
+// Anchors come from the frame's own pixels: head top = first row at least 8px wide, centre = that row's middle,
+// so per-skin head heights, per-frame bob (idle/run/attack rows), lunge dx, idle breathing oy and left/right flips all line up.
+const BODY=new WeakMap();let LASTB=null;const HAND_X=5,HAND_Y=17;
+function bodyAnc(im,row,fr){let m=BODY.get(im);if(!m){if(!im||!im.complete||!im.naturalWidth)return {top:HAT_Y,cx:HAT_X};let d=null;try{const c=document.createElement('canvas');c.width=im.naturalWidth;c.height=im.naturalHeight;const x=c.getContext('2d');x.drawImage(im,0,0);d=x.getImageData(0,0,c.width,c.height).data}catch(e){}m={d,w:im.naturalWidth};BODY.set(im,m)}
+ const k=row*4+fr;if(m[k])return m[k];let top=-1,cx=HAT_X,first=-1;
+ if(m.d)for(let y=0;y<FH&&top<0;y++){let a=-1,b=-1,n=0;for(let x=0;x<FW;x++)if(m.d[((row*FH+y)*m.w+fr*FW+x)*4+3]>0){n++;if(a<0)a=x;b=x}if(n&&first<0)first=y;if(n>=8){top=y;cx=(a+b+1)/2}}
+ if(top<0)top=first<0?HAT_Y:first;return m[k]={top,cx}}
+const _dsBody=drawSheet;drawSheet=function(im,x,y,face,row,fr,sc=1){_dsBody(im,x,y,face,row,fr,sc);if(imgs.includes(im))LASTB={im,x:Math.round(x),y:Math.round(y),face:face<0?-1:1,row,fr,sc}};
+function hatOn(id,B){const im=hatImg(id);if(!im||!B)return;const a=bodyAnc(B.im,B.row,B.fr),sc=B.sc,cx=B.face<0?FW-a.cx:a.cx,lift=id=='hat_halo'?3+Math.round(Math.sin(t/12)):0;
+ ctx.save();ctx.translate(Math.round(B.x+cx*sc),Math.round(B.y+(a.top+1-lift)*sc-im.height*sc));ctx.scale(B.face<0?-sc:sc,sc);ctx.drawImage(im,-6,0);ctx.restore()}
+function handOf(B){const a=bodyAnc(B.im,B.row,B.fr),a0=bodyAnc(B.im,1,0),sc=B.sc;return [B.x+(FW/2+B.face*HAND_X)*sc,B.y+(HAND_Y+a.top-a0.top)*sc]}
+function weaponOn(id,B,ang){if(!B)return;const [hx,hy]=handOf(B);drawWeapon(id,hx,hy,B.face,ang,B.sc)}
 // ===== trails: colours + motion. g = per-particle gravity, k = pixel shape, s = size =====
 const TRD={tr_fire:{c:['#e04848','#f99252','#fee761'],vy:-.9},tr_ice:{c:['#ffffff','#a8e0f8','#8fb8ff'],vy:.1},tr_spark:{c:['#ffffff','#fee761','#fff0a0'],l:18,ch:.5},tr_rainbow:{c:['#e04848','#fee761','#5fcde4']},
  tr_bubble:{c:['#a8e0f8','#d8f4ff','#8fb8ff'],vy:-.4,g:-.01,k:'ring',l:26,ch:.25},tr_hearts:{c:['#ff8ad0','#e04848','#ffb8e0'],vy:-.5,g:-.01,k:'heart',l:26,ch:.25},
@@ -1031,6 +1045,8 @@ function drawFX(list){for(const e of list){e.a++;const k=e.a/e.l;ctx.save();
  ctx.restore()}
  for(let n=list.length-1;n>=0;n--)if(list[n].a>=list[n].l)list.splice(n,1)}
 const ANS=new WeakMap();
+// world-space draws: plain error guard (safe() would shift into the 480x270 UI box and offset attachments)
+function tryq(fn){try{fn()}catch(e){}}
 const _drawFc=drawF;drawF=function(f,oy){if(f.out||f.respawn>0){_drawFc(f,oy);return}
  let A=ANS.get(f);if(!A)ANS.set(f,A={g:f.ground,vy:0,fl:0});
  if(state!='pause'){if(f.ground&&!A.g&&A.vy>1.5)safe(()=>{for(let n=0;n<8&&parts.length<PMAX;n++){const d=n<4?-1:1;parts.push({x:f.x+5+d*(2+Math.random()*3),y:f.y+f.h-1,vx:d*(.4+Math.random()*.9),vy:-Math.random()*.4,g:-.01,s:2,l:16,c:n%2?'#d8dde6':'#9aa0b8'})}});
@@ -1038,11 +1054,11 @@ const _drawFc=drawF;drawF=function(f,oy){if(f.out||f.respawn>0){_drawFc(f,oy);re
   A.g=f.ground;A.vy=f.vy;A.fl=f.flash}
  // idle breathing: 1px bob when standing still
  if(f.ground&&Math.abs(f.vx)<.25&&!(f.atkT>0)&&!(f.hitstun>0)&&!(f.dashT>0)&&Math.floor((t+f.i*13)/24)%2)oy+=1;
- _drawFc(f,oy);const eq=fCos(f.i);
- if(eq.trail&&state!='pause'&&(f.dashT>0||Math.abs(f.vx)>1.2||Math.abs(f.vy)>2))safe(()=>trailPart(eq.trail,f.x+5,f.y+12+oy));
- if(eq.weapon&&!(f.inv>0&&Math.floor(t/3)%2))safe(()=>drawWeapon(eq.weapon,f.x+5+f.face*5,f.y+17+oy,f.face,wpAng(f.atkT)));
- if(eq.hat&&!(f.inv>0&&Math.floor(t/3)%2))safe(()=>drawHat(eq.hat,f.x-3,f.y-4+oy,f.face));
- if(eq.name&&state=='ofight'&&NET.names)safe(()=>text(String(NET.names[f.i]||'').slice(0,10),f.x+5,f.y-14+oy,nameCol(eq),8,'center'))};
+ LASTB=null;_drawFc(f,oy);const eq=fCos(f.i),B=LASTB&&LASTB.im===imgs[f.skin]&&LASTB.sc==1?LASTB:null;
+ if(eq.trail&&state!='pause'&&(f.dashT>0||Math.abs(f.vx)>1.2||Math.abs(f.vy)>2))tryq(()=>trailPart(eq.trail,f.x+5,f.y+12+oy));
+ if(eq.weapon&&!(f.inv>0&&Math.floor(t/3)%2))B&&tryq(()=>weaponOn(eq.weapon,B,wpAng(f.atkT)));
+ if(eq.hat&&!(f.inv>0&&Math.floor(t/3)%2))B&&tryq(()=>hatOn(eq.hat,B));
+ if(eq.name&&state=='ofight'&&NET.names)tryq(()=>text(String(NET.names[f.i]||'').slice(0,10),f.x+5,f.y-14+oy,nameCol(eq),8,'center'))};
 function koExtra(id,x,y,fxl=FXL){if(id=='ko_confetti'){for(let k=0;k<50&&parts.length<PMAX;k++){const a=Math.random()*6.28,v=Math.random()*4+1;parts.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v-2,l:30+Math.random()*20,c:'hsl('+Math.floor(Math.random()*360)+',90%,60%)'})}}
  else if(id=='ko_bolt'){let bx=x;for(let yy=y-140;yy<y;yy+=3){bx+=(Math.random()-.5)*4;if(parts.length<PMAX)parts.push({x:bx,y:yy,vx:0,vy:-.08,l:16,c:yy%2?'#fee761':'#ffffff'})}addShake(8);SFX.hit&&SFX.hit()}
  else if(id=='ko_boom'){burst(x,y,'#f99252',40,5);burst(x,y,'#e04848',30,4);burst(x,y,'#fee761',20,6);addShake(12)}
@@ -1061,10 +1077,10 @@ function poseDraw(raw,id,im,x,y,face,row,fr,sc){let dy=0,dx=0;
 function trophy(x,y){ctx.fillStyle=PAL.o;ctx.fillRect(x-6,y-1,13,10);ctx.fillRect(x-2,y+8,5,5);ctx.fillRect(x-5,y+12,11,3);ctx.fillStyle='#fee761';ctx.fillRect(x-5,y,11,7);ctx.fillRect(x-1,y+7,3,5);ctx.fillRect(x-4,y+13,9,1);ctx.fillStyle='#fff0a0';ctx.fillRect(x-3,y+1,2,4)}
 const _drawSheetc=drawSheet;drawSheet=function(im,x,y,face,row,fr,sc=1){
  if(sc==3&&state=='win'&&winner&&!POSE){const eq=fCos(winner.i);if(eq.pose||eq.hat){POSE=1;try{const [px,py,pf]=eq.pose?poseDraw(_drawSheetc,eq.pose,im,x,y,face,row,fr,sc):(_drawSheetc(im,x,y,face,row,fr,sc),[x,y,face]);
-  if(eq.hat)drawHat(eq.hat,px,py,pf,3);if(eq.pose=='po_trophy')trophy(px+24,py-14+Math.round(Math.sin(t/10)*2))}finally{POSE=null}return}}
+  if(eq.hat)hatOn(eq.hat,LASTB);if(eq.pose=='po_trophy')trophy(px+24,py-14+Math.round(Math.sin(t/10)*2))}finally{POSE=null}return}}
  _drawSheetc(im,x,y,face,row,fr,sc)};
 const _drawResc=drawResults;drawResults=function(){_drawResc();const R=NET.res;if(!R||R.winner==null||!NET.slots)return;safe(()=>{const s=NET.slots[R.winner],eq=fCos(R.winner);if(!s||!(eq.pose||eq.hat))return;
- const fr=Math.floor(t/7)%4;const [px,py,pf]=eq.pose?poseDraw(_drawSheetc,eq.pose,imgs[s.skin],372,26,-1,2,fr,2):(_drawSheetc(imgs[s.skin],372,26,-1,2,fr,2),[372,26,-1]);if(eq.hat)drawHat(eq.hat,px,py,pf,2);if(eq.pose=='po_trophy')trophy(px+16,py-8)})};
+ const fr=Math.floor(t/7)%4;const [px,py,pf]=eq.pose?poseDraw(_drawSheetc,eq.pose,imgs[s.skin],372,26,-1,2,fr,2):(_drawSheetc(imgs[s.skin],372,26,-1,2,fr,2),[372,26,-1]);if(eq.hat)hatOn(eq.hat,LASTB);if(eq.pose=='po_trophy')trophy(px+16,py-8)})};
 // themed map/bg caches keyed by (map, theme)
 const mapCacheT=new Map();const _mapCanvasc=mapCanvas;mapCanvas=function(m=map){const i=ARENAS.findIndex(a=>a.map===m);const th=i<0?0:thSub(i);if(th===i||i<0)return _mapCanvasc(m);
  const k=th;let c=mapCacheT.get(m);if(!c)mapCacheT.set(m,c={});if(!c[k]){const sv=map;map=m;const cv=document.createElement('canvas');cv.width=m[0].length*T;cv.height=m.length*T+T;const real=ctx;ctx=cv.getContext('2d');ctx.imageSmoothingEnabled=false;drawMapRaw(T);ctx=real;map=sv;c[k]=cv}return c[k]};
@@ -1115,8 +1131,8 @@ function drawShop(){const tb=SH.tab;text('STORE',W/2,22,PAL.Y,24,'center');acctB
  // preview
  panel(40,92,400,128);const sk=pvSkin(),fr=Math.floor(t/7)%4;
  if(it.cat=='arena'){PVTH=it.id;try{const bg=bgCanvas(it.th);ctx.drawImage(bg,0,0,W,H,52,98,150,84);const mc=mapCanvas(ARENAS[it.base].map);ctx.drawImage(mc,0,0,mc.width,mc.height,52,98+84-Math.round(150*mc.height/mc.width),150,Math.round(150*mc.height/mc.width))}finally{PVTH=null}}
- else if(it.cat=='pose'){const [px,py,pf]=poseDraw(_drawSheetc,it.id,imgs[sk],84,108,1,2,fr,3);if(myEq().hat)drawHat(myEq().hat,px,py,pf,3);if(it.id=='po_trophy')trophy(px+24,py-14)}
- else{const sv=state;_drawSheetc(imgs[sk],84,108,1,it.cat=='trail'?2:1,it.cat=='trail'?fr:0,3);const h=it.cat=='hat'?it.id:myEq().hat;if(h)drawHat(h,84,108,1,3);const wp=it.cat=='weapon'?it.id:myEq().weapon;if(wp)drawWeapon(wp,84+13*3,108+17*3,1,wpAng(20-Math.floor(t/2)%30),3);
+ else if(it.cat=='pose'){const [px,py,pf]=poseDraw(_drawSheetc,it.id,imgs[sk],84,108,1,2,fr,3);if(myEq().hat)hatOn(myEq().hat,LASTB);if(it.id=='po_trophy')trophy(px+24,py-14)}
+ else{const sv=state;_drawSheetc(imgs[sk],84,108,1,it.cat=='trail'?2:1,it.cat=='trail'?fr:0,3);const h=it.cat=='hat'?it.id:myEq().hat;const BB=LASTB;if(h)hatOn(h,BB);const wp=it.cat=='weapon'?it.id:myEq().weapon;if(wp)weaponOn(wp,BB,wpAng(20-Math.floor(t/2)%30));
   if(it.cat=='name'){const nm=ACC.user?(ACC.user.name||ACC.user.username||'PLAYER'):'PLAYER';text(nm.slice(0,12),108,104,nameCol({name:it.id}),16,'center')}}
  for(const p of SH.pv)drawP(p,p.l>12?3:2);if(SH.fx)drawFX(SH.fx);
  text(it.n,220,122,PAL.Y,16);text(TABS[tb].n,220,108,'#d8dde6',8);
