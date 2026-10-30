@@ -1127,14 +1127,21 @@ function ltFinish(){const ci=PB2.bracketChamp(LT.T),C=LT.ent[ci];LT.champ=C;stat
  if(ONLINE&&ACC.user&&LT.ticket){api('local/tourney',{ticket:LT.ticket,size:LT.size,won:!!C.human}).then(j=>{LT.res=j;if(j.user)setUser(j.user);if(j.coins)SFX.coin()}).catch(()=>{})}LT.ticket=null}
 function ltQuit(){if(LT.orig)slots.forEach((s,i)=>Object.assign(s,LT.orig[i]));LT.on=false;state='menu'}
 const _updT=update;update=function(){
- if(LT.on&&state=='win'&&(mOK()||mStart()||mBack())){const w=winner,n=LT.cur;let e=w&&LT.pos[w.i];if(!e){const live=F.filter(f=>f&&!f.out).sort((a,b)=>b.stocks-a.stocks||a.dmg-b.dmg);e=live.length?LT.pos[live[0].i]:LT.ent[n.a]}
+ // left a tournament some other way (pause > QUIT TO MENU): restore the player's slots and drop tournament mode
+ if(LT.on&&state=='menu'){ltQuit()}
+ if(LT.on&&state=='win'&&!LT.cur)LT.on=false;
+  if(LT.on&&state=='win'){t++;pollPads();if(_prevState!='win')localClaim();_prevState='win';try{ltWin()}finally{endPads()}return}// own win input: the base win handler would rematch on a controller press
+ if(state=='ltsetup'||state=='ltbracket'||state=='ltchamp'){t++;pollPads();try{updLT()}finally{endPads()}return}// these screens bypass the base update(), so do its per-frame pad work here: without pollPads/endPads controller input froze
+ _updT()};
+function ltWin(){if(!(mOK()||mStart()||mBack()))return;
+const w=winner,n=LT.cur;let e=w&&LT.pos[w.i];if(!e){const live=F.filter(f=>f&&!f.out).sort((a,b)=>b.stocks-a.stocks||a.dmg-b.dmg);e=live.length?LT.pos[live[0].i]:LT.ent[n.a]}
   PB2.bracketReport(LT.T,n.r,n.m,LT.ent.indexOf(e));LT.cur=null;ltSimCPU();SFX.ok();if(PB2.bracketNext(LT.T))state='ltbracket';else ltFinish();return}
+function updLT(){
  if(state=='ltsetup'){LT.sel=listNav(3,LT.sel);if(mBack()){SFX.back();state='menu';return}
   if(mL()||mR()){const d=mL()?-1:1;if(LT.sel==0)LT.size=LT.size==4?8:4;if(LT.sel==1)LT.hum=Math.max(1,Math.min(4,LT.hum+d));SFX.sel()}
   if(mOK()||mStart()){SFX.ok();if(LT.sel==2)ltBegin();else if(LT.sel==1)LT.hum=LT.hum%4+1;else LT.size=LT.size==4?8:4}return}
  if(state=='ltbracket'){if(mBack()){SFX.back();ltQuit();return}if(mOK()||mStart())ltPlay();return}
- if(state=='ltchamp'){if(mOK()||mStart()||mBack()){SFX.ok();LT.on=false;state='menu'}return}
- _updT()};
+ if(state=='ltchamp'){if(mOK()||mStart()||mBack()){SFX.ok();LT.on=false;state='menu'}return}}
 const _drawUIL=drawUI;drawUI=function(){if(state=='ltsetup')drawLTSetup();else if(state=='ltbracket')drawLTBracket();else if(state=='ltchamp')drawLTChamp();else _drawUIL()};
 function drawLTSetup(){text('TOURNAMENT',W/2,40,PAL.Y,32,'center');panel(W/2-120,60,240,90);
  const it=['ENTRANTS: \u2190 '+LT.size+' \u2192','HUMAN PLAYERS: \u2190 '+LT.hum+' \u2192','START BRACKET'];drawList(it,LT.sel,W/2,82,226,20);
