@@ -20,8 +20,11 @@ const COSMETICS=[
  {id:'po_jump',cat:'pose',n:'VICTORY HOP',p:200},{id:'po_spin',cat:'pose',n:'SPIN',p:250},{id:'po_dance',cat:'pose',n:'DANCE',p:300},{id:'po_trophy',cat:'pose',n:'TROPHY RAISE',p:400},
  {id:'nc_gold',cat:'name',n:'GOLD NAME',p:100,c:'#fee761'},{id:'nc_mint',cat:'name',n:'MINT NAME',p:100,c:'#7fe0d0'},{id:'nc_pink',cat:'name',n:'PINK NAME',p:150,c:'#ff8ad0'},
  {id:'nc_sky',cat:'name',n:'SKY NAME',p:150,c:'#8fb8ff'},{id:'nc_fire',cat:'name',n:'FIRE NAME',p:200,c:'#f99252'},{id:'nc_rainbow',cat:'name',n:'RAINBOW NAME',p:300,c:'rainbow'},
- {id:'ar_night',cat:'arena',n:'NIGHT MEADOW',p:400,base:0,th:5},{id:'ar_volcano',cat:'arena',n:'VOLCANO TOWERS',p:700,base:1,th:6}];
-const COS_CATS=['hat','trail','ko','pose','name','arena'];
+ {id:'ar_night',cat:'arena',n:'NIGHT MEADOW',p:400,base:0,th:5},{id:'ar_volcano',cat:'arena',n:'VOLCANO TOWERS',p:700,base:1,th:6},
+ // melee weapons: purely visual (damage/hitboxes unchanged)
+ {id:'wp_bat',cat:'weapon',n:'BASEBALL BAT',p:200},{id:'wp_wrench',cat:'weapon',n:'WRENCH',p:250},{id:'wp_sword',cat:'weapon',n:'SWORD',p:300},{id:'wp_spear',cat:'weapon',n:'SPEAR',p:350},
+ {id:'wp_axe',cat:'weapon',n:'BATTLE AXE',p:400},{id:'wp_hammer',cat:'weapon',n:'WAR HAMMER',p:450},{id:'wp_katana',cat:'weapon',n:'KATANA',p:600},{id:'wp_beam',cat:'weapon',n:'BEAM SABER',p:800}];
+const COS_CATS=['hat','trail','ko','pose','name','arena','weapon'];
 const COS_BY=Object.fromEntries(COSMETICS.map(c=>[c.id,c]));
 // parse a stored cosm JSON into {own:[ids],eq:{cat:id}}, dropping anything unknown or not owned
 function cosParse(j){let o;try{o=typeof j=='string'?JSON.parse(j||'{}'):(j||{})}catch(e){o={}}const own=Array.isArray(o.own)?o.own.filter(id=>COS_BY[id]):[];const eq={};

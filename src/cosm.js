@@ -17,12 +17,29 @@ const HATC={};function hatImg(id){if(!HATC[id]){const h=HATS[id];if(!h)return nu
 const HAT_X=8,HAT_Y=5;
 function drawHat(id,sx,sy,face,sc=1){const im=hatImg(id);if(!im)return;const lift=id=='hat_halo'?3+Math.round(Math.sin(t/12)):0;
  ctx.save();ctx.translate(Math.round(sx+HAT_X*sc),Math.round(sy+(HAT_Y-lift)*sc-im.height*sc+sc));ctx.scale(face<0?-sc:sc,sc);ctx.drawImage(im,-6,0);ctx.restore()}
+const WPN={
+ wp_bat:[[".o.","oBo","oBo","oBo","oBo","oBo",".o.","oho","oho",".o."],{B:'#c8945a',h:'#5a3a22'}],
+ wp_wrench:[["o.o.o","oSoSo","oSSSo",".oSo.",".oSo.",".oSo.",".oSo.",".oSo.",".oho.",".oho.","..o.."],{S:'#b8c0d0',h:'#e04848'}],
+ wp_sword:[[".o.","oWo","oWo","oWo","oWo","oWo","oWo","oWo","ooooo","oYYYo","ooooo",".oho.",".oho.","..o.."].map(r=>r.length<5?'.'+r+'.':r),{W:'#e8eef6',Y:'#fee761',h:'#5a3a22'}],
+ wp_spear:[[".o.","oWo","oWo","oWo",".o.",".h.",".h.",".h.",".h.",".h.",".h.",".h.",".h.",".h.",".h.",".o."],{W:'#d0d8e4',h:'#8a5a32'}],
+ wp_axe:[["..o..","oooh.","oWWho","oWWho","oooh.","..h..","..h..","..h..","..h..","..h..","..h..","..o.."],{W:'#c8d0dc',h:'#8a5a32'}],
+ wp_hammer:[["ooooooo","oGGGGGo","oGGGGGo","ooohooo","...h...","...h...","...h...","...h...","...h...","...h...","...o..."],{G:'#8a90a8',h:'#8a5a32'}],
+ wp_katana:[[".o.","oWo","oWo","oWo","oWo","oWo","oWo","oWo","oWo","oWo","ooo","oko","oko",".o."],{W:'#f4f8ff',k:'#2b2b40'}],
+ wp_beam:[[".C.","CwC","CwC","CwC","CwC","CwC","CwC","CwC","CwC","CwC","CwC","oSo","oSo",".o."],{C:'#5fcde4',w:'#ffffff',S:'#9aa0b8'}]};
+const WPC={};function wpImg(id){if(!WPC[id]){const h=WPN[id];if(!h)return null;const r=h[0],wd=Math.max(...r.map(x=>x.length)),c=document.createElement('canvas');c.width=wd;c.height=r.length;const x=c.getContext('2d');
+ r.forEach((row,y)=>{const off=Math.floor((wd-row.length)/2);[...row].forEach((ch,k)=>{if(ch=='.')return;x.fillStyle=ch=='o'?PAL.o:h[1][ch];x.fillRect(k+off,y,1,1)})});WPC[id]=c}return WPC[id]}
+// angle: 0 = pointing up; idle held forward-up, attack (atkT 20..0) swings from over the shoulder to forward-down
+function wpAng(atkT){if(!(atkT>0))return .55;if(atkT>14)return -1.2+(20-atkT)*.05;if(atkT>=8)return -.9+(14-atkT)*.38;return 1.9-(8-atkT)*.15}
+function drawWeapon(id,hx,hy,face,ang,sc=1){const im=wpImg(id);if(!im)return;ctx.save();ctx.translate(Math.round(hx),Math.round(hy));ctx.scale(face<0?-sc:sc,sc);ctx.rotate(ang);
+ if(id=='wp_beam'){ctx.globalAlpha=.35;ctx.fillStyle='#5fcde4';ctx.fillRect(-im.width/2-1,-im.height,im.width+2,im.height-3);ctx.globalAlpha=1}
+ ctx.drawImage(im,-Math.floor(im.width/2),-im.height+2);ctx.restore()}
 const TRC={tr_fire:['#e04848','#f99252','#fee761'],tr_ice:['#ffffff','#a8e0f8','#8fb8ff'],tr_spark:['#ffffff','#fee761','#fff0a0']};
 function trailCol(id){return id=='tr_rainbow'?'hsl('+((t*9)%360)+',90%,60%)':TRC[id][Math.floor(Math.random()*3)]}
 function trailPart(id,x,y,list=parts){if(list.length>=PMAX)return;const sp=id=='tr_spark';if(sp&&Math.random()<.5)return;
  list.push({x:x+(Math.random()-.5)*6,y:y+(Math.random()-.5)*6,vx:(Math.random()-.5)*.6,vy:id=='tr_fire'?-.9:id=='tr_ice'?.1:-.2,l:sp?18:14,c:trailCol(id)})}
 const _drawFc=drawF;drawF=function(f,oy){_drawFc(f,oy);if(f.out||f.respawn>0)return;const eq=fCos(f.i);
  if(eq.trail&&state!='pause'&&(f.dashT>0||Math.abs(f.vx)>1.2||Math.abs(f.vy)>2))safe(()=>trailPart(eq.trail,f.x+5,f.y+12+oy));
+ if(eq.weapon&&!(f.inv>0&&Math.floor(t/3)%2))safe(()=>drawWeapon(eq.weapon,f.x+5+f.face*5,f.y+13+oy,f.face,wpAng(f.atkT)));
  if(eq.hat&&!(f.inv>0&&Math.floor(t/3)%2))safe(()=>drawHat(eq.hat,f.x-3,f.y-4+oy,f.face));
  if(eq.name&&state=='ofight'&&NET.names)safe(()=>text(String(NET.names[f.i]||'').slice(0,10),f.x+5,f.y-14+oy,nameCol(eq),8,'center'))};
 function koExtra(id,x,y){if(id=='ko_confetti'){for(let k=0;k<50&&parts.length<PMAX;k++){const a=Math.random()*6.28,v=Math.random()*4+1;parts.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v-2,l:30+Math.random()*20,c:'hsl('+Math.floor(Math.random()*360)+',90%,60%)'})}}
@@ -46,14 +63,15 @@ const mapCacheT=new Map();const _mapCanvasc=mapCanvas;mapCanvas=function(m=map){
  const k=th;let c=mapCacheT.get(m);if(!c)mapCacheT.set(m,c={});if(!c[k]){const sv=map;map=m;const cv=document.createElement('canvas');cv.width=m[0].length*T;cv.height=m.length*T+T;const real=ctx;ctx=cv.getContext('2d');ctx.imageSmoothingEnabled=false;drawMapRaw(T);ctx=real;map=sv;c[k]=cv}return c[k]};
 const _curThc=curTh;curTh=function(){const r=_curThc();return state=='title'?r:thSub(r)};
 // ===== Store (tabbed) =====
-const TABS=[{c:'skin',n:'SKINS'},{c:'hat',n:'HATS'},{c:'trail',n:'TRAILS'},{c:'ko',n:'KO FX'},{c:'pose',n:'POSES'},{c:'name',n:'NAMES'},{c:'arena',n:'ARENAS'}];
-const SH={tab:0,sel:[4,0,0,0,0,0,0],back:'menu',busy:false,pv:[],pt:0};
+const TABS=[{c:'skin',n:'SKINS'},{c:'hat',n:'HATS'},{c:'trail',n:'TRAILS'},{c:'ko',n:'KO FX'},{c:'pose',n:'POSES'},{c:'name',n:'NAMES'},{c:'arena',n:'ARENAS'},{c:'weapon',n:'WEAPONS'}];
+const SH={tab:0,sel:[4,0,0,0,0,0,0,0],back:'menu',busy:false,pv:[],pt:0};
 const tabItems=c=>PDBCore.COSMETICS.filter(x=>x.cat==c);
 const ownC=id=>!!(ACC.user&&ACC.user.cosm&&ACC.user.cosm.own.includes(id));
 const eqC=it=>myEq()[it.cat]===it.id;
 function pvSkin(){const s=SH.sel[0];return owned(s)?s:(slots[0]&&owned(slots[0].skin)?slots[0].skin:0)}
 function shopBuy(it){if(SH.busy)return;if(!ACC.user){toast('LOG IN TO SHOP');SFX.err();return}
  if(ownC(it.id)){SH.busy=true;api('shop/equip',{cat:it.cat,item:eqC(it)?null:it.id}).then(j=>{SH.busy=false;ACC.user=j.user;SFX.sel();toast(eqC(it)?it.n+' EQUIPPED':it.n+' REMOVED');if(NET.ws&&NET.ws.readyState==1)NET.ws.send(JSON.stringify({t:'cos'}))}).catch(e=>{SH.busy=false;toast(e.message);SFX.err()});return}
+ if(it.off){toast('ITEM UNAVAILABLE');SFX.err();return}
  if(ACC.user.coins<it.p){toast('NOT ENOUGH COINS');SFX.err();return}
  SH.busy=true;api('shop/item',{item:it.id}).then(j=>{SH.busy=false;ACC.user=j.user;SFX.unlock();setTimeout(()=>SFX.coin(),350);toast(it.n+' UNLOCKED + EQUIPPED!');burst(W/2,120,'#fee761',30,3);if(NET.ws&&NET.ws.readyState==1)NET.ws.send(JSON.stringify({t:'cos'}))}).catch(e=>{SH.busy=false;toast(e.message);SFX.err()})}
 function updShop(){if(mBack()){state=SH.back=='online'?'online':'menu';SFX.back();return}
@@ -69,7 +87,7 @@ function updShop(){if(mBack()){state=SH.back=='online'?'online':'menu';SFX.back(
  const it=L[s];for(const p of SH.pv){p.x+=p.vx;p.y+=p.vy;p.vy+=.05;p.l--}SH.pv=SH.pv.filter(p=>p.l>0);SH.pt++;
  if(it.cat=='trail'){trailPart(it.id,96+Math.sin(SH.pt/14)*30,190,SH.pv)}
  if(it.cat=='ko'&&SH.pt%70==1){const sv=parts;parts=SH.pv;const x=110,y=176;try{if(it.id=='ko_bolt'){let bx=x;for(let yy=y-36;yy<y;yy+=3){bx+=(Math.random()-.5)*4;parts.push({x:bx,y:yy,vx:0,vy:-.05,l:16,c:yy%2?'#fee761':'#ffffff'})}}else if(it.id=='ko_confetti')koExtra(it.id,x,y);else{burst(x,y,'#f99252',30,3);burst(x,y,'#fee761',15,4)}}finally{parts=sv}}}
-function itemIcon(it,x,y){if(it.cat=='hat')drawHat(it.id,x+2,y+14,1,2);
+function itemIcon(it,x,y){if(it.cat=='weapon')drawWeapon(it.id,x+12,y+26,1,.6);else if(it.cat=='hat')drawHat(it.id,x+2,y+14,1,2);
  else if(it.cat=='trail'){for(let k=0;k<6;k++){ctx.fillStyle=it.id=='tr_rainbow'?'hsl('+(k*60)+',90%,60%)':TRC[it.id][k%3];ctx.fillRect(x+4+k*3,y+18-k*2,2,2)}}
  else if(it.cat=='ko'){const c=it.id=='ko_bolt'?'#fee761':it.id=='ko_boom'?'#f99252':'#ff8ad0';ctx.fillStyle=c;for(let k=0;k<8;k++){const a=k*.785;ctx.fillRect(x+13+Math.round(Math.cos(a)*7),y+15+Math.round(Math.sin(a)*7),2,2)}ctx.fillStyle='#ffffff';ctx.fillRect(x+12,y+14,3,3)}
  else if(it.cat=='pose'){if(it.id=='po_trophy')trophy(x+14,y+8);else _drawSheetc(imgs[pvSkin()],x+6,y+2,1,it.id=='po_jump'?2:1,it.id=='po_jump'?1:0,1)}
@@ -85,17 +103,18 @@ function drawShop(){const tb=SH.tab;text('STORE',W/2,22,PAL.Y,24,'center');acctB
   bar([[['LB','RB'],'TAB'],[['DP'],'BROWSE'],[['A'],'BUY'],[['Y'],'COINS'],[['B'],'BACK']],[[['Q','E'],'TAB'],[['\u2190','\u2192'],'BROWSE'],[['ENTER'],'BUY'],[['C'],'COINS'],[['ESC'],'BACK']],242);return}
  const L=tabItems(TABS[tb].c),s=SH.sel[tb],it=L[s],per=Math.min(L.length,13),gx=Math.round((W-per*34)/2);
  L.forEach((x0,k)=>{const x=gx+k*34,y=50;panel(x,y,30,32,k==s?'#5d4a6e':'#2b2b40');safe(()=>itemIcon(x0,x+1,y));
-  if(eqC(x0))text('ON',x+15,y+30,'#a1e55a',8,'center');else if(ownC(x0.id)){ctx.fillStyle='#a1e55a';ctx.fillRect(x+23,y+3,4,2);ctx.fillRect(x+25,y+1,2,4)}else{ctx.fillStyle='#fee761';ctx.fillRect(x+24,y+2,3,3)}
+  if(eqC(x0))text('ON',x+15,y+30,'#a1e55a',8,'center');else if(ownC(x0.id)){ctx.fillStyle='#a1e55a';ctx.fillRect(x+23,y+3,4,2);ctx.fillRect(x+25,y+1,2,4)}else if(x0.off){ctx.fillStyle='#e04848';ctx.fillRect(x+3,y+15,24,2)}else{ctx.fillStyle='#fee761';ctx.fillRect(x+24,y+2,3,3)}
   if(k==s){ctx.fillStyle=PAL.Y;ctx.fillRect(x-1,y-1,32,2);ctx.fillRect(x-1,y+31,32,2);ctx.fillRect(x-1,y-1,2,34);ctx.fillRect(x+29,y-1,2,34)}});
  // preview
  panel(40,92,400,128);const sk=pvSkin(),fr=Math.floor(t/7)%4;
  if(it.cat=='arena'){PVTH=it.id;try{const bg=bgCanvas(it.th);ctx.drawImage(bg,0,0,W,H,52,98,150,84);const mc=mapCanvas(ARENAS[it.base].map);ctx.drawImage(mc,0,0,mc.width,mc.height,52,98+84-Math.round(150*mc.height/mc.width),150,Math.round(150*mc.height/mc.width))}finally{PVTH=null}}
  else if(it.cat=='pose'){const [px,py,pf]=poseDraw(_drawSheetc,it.id,imgs[sk],84,108,1,2,fr,3);if(myEq().hat)drawHat(myEq().hat,px,py,pf,3);if(it.id=='po_trophy')trophy(px+24,py-14)}
- else{const sv=state;_drawSheetc(imgs[sk],84,108,1,it.cat=='trail'?2:1,it.cat=='trail'?fr:0,3);const h=it.cat=='hat'?it.id:myEq().hat;if(h)drawHat(h,84,108,1,3);
+ else{const sv=state;_drawSheetc(imgs[sk],84,108,1,it.cat=='trail'?2:1,it.cat=='trail'?fr:0,3);const h=it.cat=='hat'?it.id:myEq().hat;if(h)drawHat(h,84,108,1,3);const wp=it.cat=='weapon'?it.id:myEq().weapon;if(wp)drawWeapon(wp,84+13*3,108+13*3,1,wpAng(20-Math.floor(t/2)%30),3);
   if(it.cat=='name'){const nm=ACC.user?(ACC.user.name||ACC.user.username||'PLAYER'):'PLAYER';text(nm.slice(0,12),108,104,nameCol({name:it.id}),16,'center')}}
  for(const p of SH.pv){ctx.fillStyle=p.c;const z=p.l>12?3:2;ctx.fillRect(Math.round(p.x),Math.round(p.y),z,z)}
  text(it.n,220,122,PAL.Y,16);text(TABS[tb].n,220,108,'#d8dde6',8);
  if(eqC(it))text('EQUIPPED  (A: REMOVE)',220,146,'#a1e55a',8);else if(ownC(it.id))text('OWNED  (A: EQUIP)',220,146,'#a1e55a',8);
+ else if(it.off)text('UNAVAILABLE',220,146,'#e04848',16);
  else{coinIcon(220,137);text(String(it.p),232,146,'#fee761',16);text(!ACC.user?'LOG IN TO BUY':ACC.user.coins>=it.p?'PRESS A / ENTER TO BUY':'NOT ENOUGH COINS YET',220,162,'#d8dde6',8)}
  if(it.cat=='arena')text('RESKINS '+THEMES[it.base].name+' WHEN YOU PLAY IT (HOST ONLINE)',220,182,'#d8dde6',8);
  text('COSMETIC ONLY - NO GAMEPLAY EFFECT',220,206,'#8b93a8',8);
