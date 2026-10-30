@@ -30,9 +30,9 @@ updLeader=function(){if(mBack()){SFX.back();state='online';return}const n=LBD.da
  if(mOK()){if(n){SFX.ok();goProfile(LBD.data.top[LBD.sel].username,'leader')}else{SFX.back();state='online'}return}
  if(mU()&&LBD.sel>0){LBD.sel--;SFX.sel()}if(mD()&&LBD.sel<n-1){LBD.sel++;SFX.sel()}if(LBD.sel<LBD.scroll)LBD.scroll=LBD.sel;if(LBD.sel>LBD.scroll+8)LBD.scroll=LBD.sel-8};
 // coin packs (only listed when the server has Stripe configured)
-const PK={on:false,list:[],sel:0,busy:false};
+const PK={on:false,list:[],sel:0,busy:false,back:'online'};
 if(ONLINE)fetch('/api/shop/packs').then(r=>r.json()).then(j=>{if(j.enabled&&j.packs.length){PK.on=true;PK.list=j.packs;ONL_ITEMS.splice(ONL_ITEMS.indexOf('SHOP')+1,0,'COIN PACKS')}}).catch(()=>{});
-function updPacks(){const n=PK.list.length+1;PK.sel=listNav(n,PK.sel);if(mBack()||(mOK()&&PK.sel==PK.list.length)){SFX.back();state='online';return}
+function updPacks(){const n=PK.list.length+1;PK.sel=listNav(n,PK.sel);if(mBack()||(mOK()&&PK.sel==PK.list.length)){SFX.back();state=PK.back||'online';return}
  if(mOK()&&!PK.busy){if(!ACC.user||ACC.user.guest){toast('MAKE AN ACCOUNT TO BUY COINS');SFX.err();return}SFX.ok();PK.busy=true;
   api('shop/checkout',{pack:PK.list[PK.sel].id}).then(j=>{if(!j.url)throw new Error(j.error);location.href=j.url}).catch(e=>{PK.busy=false;toast(String(e.message||'CHECKOUT FAILED').toUpperCase());SFX.err()})}}
 function drawPacks(){text('COIN PACKS',W/2,28,PAL.Y,32,'center');acctBadge(W-4,4,'right');panel(W/2-120,40,240,PK.list.length*26+40);
@@ -45,7 +45,7 @@ function drawPacks(){text('COIN PACKS',W/2,28,PAL.Y,32,'center');acctBadge(W-4,4
  if(P.get('paid')!='1'){setTimeout(()=>toast('PURCHASE CANCELLED'),500);return}let n=0;const go=()=>{if(!ACC.token){if(++n<40)setTimeout(go,250);return}
   api('shop/confirm',{sid}).then(j=>{if(j.user)setUser(j);toast('THANKS! COINS ADDED')}).catch(()=>toast('PAYMENT RECEIVED - COINS SOON'))};go()})();
 const _fxUpdOnl=updOnlineMenu;updOnlineMenu=function(){const o=ONL_ITEMS[onlSel];if(mOK()&&(o=='MY PROFILE'||o=='FIND PLAYER'||o=='COIN PACKS')){SFX.ok();
-  if(o=='COIN PACKS'){PK.sel=0;PK.busy=false;state='packs'}else if(o=='MY PROFILE'){if(ACC.user.guest){toast('GUESTS HAVE NO PROFILE');SFX.err()}else goProfile(ACC.user.username,'online')}
+  if(o=='COIN PACKS'){PK.sel=0;PK.busy=false;PK.back='online';state='packs'}else if(o=='MY PROFILE'){if(ACC.user.guest){toast('GUESTS HAVE NO PROFILE');SFX.err()}else goProfile(ACC.user.username,'online')}
   else{const n=prompt('Find player by username:');if(n&&n.trim())goProfile(n.trim(),'online')}return}_fxUpdOnl()};
 const _fxUpdUI=updUI;updUI=function(){if(state=='profile')updProfile();else if(state=='packs')updPacks();else _fxUpdUI()};
 const _fxDrawUI=drawUI;drawUI=function(){if(state=='profile')drawProfile();else if(state=='packs')drawPacks();else _fxDrawUI();

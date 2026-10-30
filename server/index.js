@@ -103,7 +103,7 @@ app.post('/api/shop/equip',auth,H(async(req,res)=>{const b=req.body||{},cat=b.ca
  const u=await q.byId(req.user.id),c=PDB.cosParse(u.cosm);if(id==null)delete c.eq[cat];else{const it=PDB.COS_BY[id];if(!it||it.cat!=cat)return res.status(400).json({error:'unknown item'});if(!c.own.includes(id))return res.status(403).json({error:'not owned'});c.eq[cat]=id}
  await db.run('UPDATE users SET cosm=? WHERE id=?',[JSON.stringify(c),u.id]);res.json({user:pub(await q.byId(req.user.id))})}));
 // Real-money coin packs are intentionally NOT implemented. Wire a payment provider here (e.g. Stripe Checkout + webhook that credits coins).
-FEAT.routes(app,{db,q,PDB,auth,H,pub});
+FEAT.routes(app,{db,q,PDB,auth,H,pub});app.post('/api/coins/checkout',(req,res)=>res.status(410).json({error:'open COIN PACKS in the online menu'}));
 // ===== Ranked =====
 app.get('/api/leaderboard',H(async(req,res)=>{const t=(req.get('authorization')||'').replace(/^Bearer /,''),u=await userOf(t);
  const top=await db.all('SELECT username,rating,games,wins,xp FROM users WHERE guest=0 AND games>0 ORDER BY rating DESC,wins DESC LIMIT 50');

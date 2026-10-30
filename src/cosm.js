@@ -133,7 +133,7 @@ function shopBuy(it){if(SH.busy)return;if(!ACC.user){toast('LOG IN TO SHOP');SFX
  SH.busy=true;api('shop/item',{item:it.id}).then(j=>{SH.busy=false;ACC.user=j.user;SFX.unlock();setTimeout(()=>SFX.coin(),350);toast(it.n+' UNLOCKED + EQUIPPED!');burst(W/2,120,'#fee761',30,3);if(NET.ws&&NET.ws.readyState==1)NET.ws.send(JSON.stringify({t:'cos'}))}).catch(e=>{SH.busy=false;toast(e.message);SFX.err()})}
 function updShop(){if(mBack()){state=SH.back=='online'?'online':'menu';SFX.back();return}
  if(KP.KeyQ||anyPad(i=>padEdge(i,'LB'))){SH.tab=(SH.tab+TABS.length-1)%TABS.length;SFX.sel()}if(KP.KeyE||KP.Tab||anyPad(i=>padEdge(i,'RB'))){SH.tab=(SH.tab+1)%TABS.length;SFX.sel()}
- if(KP.KeyC||anyPad(i=>padEdge(i,'Y'))){api('coins/checkout',{pack:'small'}).then(()=>toast('OK')).catch(e=>{toast(e.message);SFX.err()})}
+ if(KP.KeyC||anyPad(i=>padEdge(i,'Y'))){if(typeof PK!='undefined'&&PK.on){SFX.ok();PK.sel=0;PK.busy=false;PK.back='shop';state='packs'}else{toast('COIN PACKS COMING SOON');SFX.err()}}
  const tb=SH.tab;
  if(tb==0){let s=SH.sel[0],c=s%SGC,r=Math.floor(s/SGC);const R=Math.ceil(NS/SGC);if(mL()){c=(c+SGC-1)%SGC;SFX.sel()}if(mR()){c=(c+1)%SGC;SFX.sel()}if(mU()){r=(r+R-1)%R;SFX.sel()}if(mD()){r=(r+1)%R;SFX.sel()}SH.sel[0]=Math.min(NS-1,r*SGC+c);
   if(mOK()&&!SH.busy){const n=SH.sel[0];if(owned(n)){toast('ALREADY UNLOCKED');SFX.sel();return}if(ACC.user.coins<PRICES[n]){toast('NOT ENOUGH COINS');SFX.err();return}
