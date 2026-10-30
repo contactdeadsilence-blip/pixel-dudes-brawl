@@ -1,3 +1,4 @@
+const SGC=11;
 // ===== Store cosmetics (hats, trails, KO fx, poses, name colors, arena themes) =====
 let PVTH=null;const CB=PDBCore.COS_BY;
 function myEq(){return ACC.user&&ACC.user.cosm?ACC.user.cosm.eq:{}}
@@ -133,7 +134,7 @@ function updShop(){if(mBack()){state=SH.back=='online'?'online':'menu';SFX.back(
  if(KP.KeyQ||anyPad(i=>padEdge(i,'LB'))){SH.tab=(SH.tab+TABS.length-1)%TABS.length;SFX.sel()}if(KP.KeyE||KP.Tab||anyPad(i=>padEdge(i,'RB'))){SH.tab=(SH.tab+1)%TABS.length;SFX.sel()}
  if(KP.KeyC||anyPad(i=>padEdge(i,'Y'))){api('coins/checkout',{pack:'small'}).then(()=>toast('OK')).catch(e=>{toast(e.message);SFX.err()})}
  const tb=SH.tab;
- if(tb==0){let s=SH.sel[0],c=s%GC,r=Math.floor(s/GC);const R=Math.ceil(NS/GC);if(mL()){c=(c+GC-1)%GC;SFX.sel()}if(mR()){c=(c+1)%GC;SFX.sel()}if(mU()){r=(r+R-1)%R;SFX.sel()}if(mD()){r=(r+1)%R;SFX.sel()}SH.sel[0]=Math.min(NS-1,r*GC+c);
+ if(tb==0){let s=SH.sel[0],c=s%SGC,r=Math.floor(s/SGC);const R=Math.ceil(NS/SGC);if(mL()){c=(c+SGC-1)%SGC;SFX.sel()}if(mR()){c=(c+1)%SGC;SFX.sel()}if(mU()){r=(r+R-1)%R;SFX.sel()}if(mD()){r=(r+1)%R;SFX.sel()}SH.sel[0]=Math.min(NS-1,r*SGC+c);
   if(mOK()&&!SH.busy){const n=SH.sel[0];if(owned(n)){toast('ALREADY UNLOCKED');SFX.sel();return}if(ACC.user.coins<PRICES[n]){toast('NOT ENOUGH COINS');SFX.err();return}
    SH.busy=true;api('shop/buy',{skin:n}).then(j=>{SH.busy=false;ACC.user=j.user;SFX.unlock();setTimeout(()=>SFX.coin(),350);toast(NAMES[n]+' UNLOCKED!');burst(W/2,120,'#fee761',30,3)}).catch(e=>{SH.busy=false;toast(e.message);SFX.err()})}return}
  const L=tabItems(TABS[tb].c);let s=SH.sel[tb];if(mL()||mU()){s=(s+L.length-1)%L.length;SFX.sel()}if(mR()||mD()){s=(s+1)%L.length;SFX.sel()}SH.sel[tb]=s;
@@ -150,8 +151,8 @@ function itemIcon(it,x,y){if(state=='shop'&&SH.tab>0){const L0=tabItems(TABS[SH.
  else if(it.cat=='arena'){const T0=THEMES[it.th];ctx.fillStyle=PAL.o;ctx.fillRect(x+3,y+6,22,20);ctx.fillStyle=T0.thumb;ctx.fillRect(x+4,y+7,20,18);ctx.drawImage(T0.top,0,0,16,8,x+4,y+19,20,6)}}
 function drawShop(){const tb=SH.tab;text('STORE',W/2,22,PAL.Y,24,'center');acctBadge(W-4,4,'right');
  let tx=8;TABS.forEach((T0,k)=>{const w=T0.n.length*6+10;panel(tx,28,w,14,k==tb?'#5d4a6e':'#2b2b40');text(T0.n,tx+w/2,39,k==tb?PAL.Y:'#d8dde6',8,'center');tx+=w+3});
- if(tb==0){const gx=Math.round((W-GC*30)/2),gy=46;
-  for(let n=0;n<NS;n++){const x=gx+(n%GC)*30,y=gy+Math.floor(n/GC)*30;panel(x,y,28,28,n==SH.sel[0]?'#5d4a6e':'#2b2b40');ctx.drawImage(imgs[n],0,0,FW,FH,x+6,y+2,FW,FH);if(!owned(n))lockIcon(x,y,PRICES[n]);
+ if(tb==0){const gx=Math.round((W-SGC*30)/2),gy=46;
+  for(let n=0;n<NS;n++){const x=gx+(n%SGC)*30,y=gy+Math.floor(n/SGC)*30;panel(x,y,28,28,n==SH.sel[0]?'#5d4a6e':'#2b2b40');ctx.drawImage(imgs[n],0,0,FW,FH,x+6,y+2,FW,FH);if(!owned(n))lockIcon(x,y,PRICES[n]);
    if(n==SH.sel[0]){ctx.fillStyle=PAL.Y;ctx.fillRect(x-1,y-1,30,2);ctx.fillRect(x-1,y+27,30,2);ctx.fillRect(x-1,y-1,2,30);ctx.fillRect(x+27,y-1,2,30)}}
   const n=SH.sel[0];panel(60,140,360,72);drawSheet(imgs[n],76,142,1,2,Math.floor(t/7)%4,3);text(NAMES[n],140,162,PAL.Y,24);
   if(owned(n))text('UNLOCKED',140,186,'#a1e55a',16);else{coinIcon(140,177);text(String(PRICES[n]),152,186,'#fee761',16);text(ACC.user&&ACC.user.coins>=PRICES[n]?'PRESS A / ENTER TO BUY':'EARN COINS: PLAY ONLINE OR VS CPU WHILE LOGGED IN',140,202,'#d8dde6',8)}
