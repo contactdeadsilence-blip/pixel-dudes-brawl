@@ -127,10 +127,10 @@ function netOpen(first){if(NET.ws&&NET.ws.readyState<=1){if(NET.ws.readyState==1
 function netClose(){if(NET.ws){const w=NET.ws;NET.ws=null;try{w.close()}catch(e){}}NET.lobby=null}
 function netLeave(){netSend({t:'leave'});NET.lobby=null;state='online';opause=false}
 function netMsg(m){if(m.t=='lobby'){NET.lobby=m;if(state=='online'||state=='joincode')state='lobby'}
- else if(m.t=='start'){NET.you=m.you;NET.names=m.slots.map(s=>s?s.name:'');NET.slots=m.slots;NET.cos=m.slots.map(s=>s&&s.cos||{});NET.th=m.th||null;CORE.startFight(m.slots,m.arena,{stocks:m.stocks,mode:m.mode||'stock',time:m.time||0,items:m.items|0,ff:!!m.ff});syncCore();arena=m.arena;parts=[];NET.snaps=[];NET.rt=-1;NET.lt=0;NET.own=false;NET.X=null;NET.tm=0;NET.lb=-1;NET.res=null;opause=false;state='ofight';camUpdate(true)}
+ else if(m.t=='start'){NET.you=m.you;NET.names=m.slots.map(s=>s?s.name:'');NET.slots=m.slots;NET.cos=m.slots.map(s=>s&&s.cos||{});NET.th=m.th||null;CORE.startFight(m.slots,m.arena,{stocks:m.stocks,mode:m.mode||'stock',time:m.time||0,items:m.items|0,ff:!!m.ff,pitCap:m.pitCap|0});syncCore();arena=m.arena;parts=[];NET.snaps=[];NET.rt=-1;NET.lt=0;NET.own=false;NET.X=null;NET.tm=0;NET.lb=-1;NET.res=null;opause=false;state='ofight';camUpdate(true)}
  else if(m.t=='snap'){if(state!='ofight'&&!(state=='settings'&&ST.back=='ofight'))return;m.arr=performance.now();if(m.X)NET.X=m.X;if(m.timer!=null)NET.tm=m.timer;m.X=NET.X;m.timer=NET.tm;m.readyT=m.readyT|0;m.endT=m.endT|0;NET.snaps.push(m);if(NET.snaps.length>40)NET.snaps.shift();
   for(const e of m.ev||[]){if(e[0]=='s'){SFX[e[1]]&&SFX[e[1]](e[2])}else if(e[0]=='k')addShake(e[1]);else if(e[0]=='b')burst(e[1],e[2],e[3],e[4],e[5]);else if(e[0]=='o')koFx(e[2],e[3],e[1],e[4]);else if(e[0]=='p')partFx(e[1],e[2])}}
- else if(m.t=='end'){NET.res=m;chalToast(m.chal);if(ACC.user&&m.coins!=null)ACC.user.coins=m.coins;const r=m.rank.find(r=>r.i==NET.you);if(r&&r.coins)setTimeout(()=>SFX.coin(),900);if(state=='settings')state='oresult';else state='oresult';opause=false}
+ else if(m.t=='end'){NET.res=m;chalToast(m.chal);if(ACC.user&&m.coins!=null)ACC.user.coins=m.coins;const r=m.rank.find(r=>r.i==NET.you);if(r&&r.coins)setTimeout(()=>SFX.coin(),900);if(r&&r.bd&&r.bd.jackpot)setTimeout(()=>{toast('JACKPOT! +'+r.bd.jackpot+' COINS');SFX.coin()},1400);if(state=='settings')state='oresult';else state='oresult';opause=false}
  else if(m.t=='user'){ACC.user=m.user}
  else if(m.t=='notice'){toast(String(m.m||''))}
  else if(m.t=='err'){toast(m.m);SFX.err();if(m.fatal&&state=='lobby')state='online'}}

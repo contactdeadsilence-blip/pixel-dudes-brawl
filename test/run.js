@@ -62,6 +62,7 @@ const wait=(f,ms,what)=>new Promise((res,rej)=>{const t0=Date.now(),h=setInterva
   assert.equal((await adm('unlock-all',{username:'unlockme'})).status,401);assert.equal((await adm('unlock-all',{username:'nobody_x'},AK)).status,404);
   const UT=(await api('register',{username:'unlockme',password:'pw1234'})).j.token;r=await adm('unlock-all',{username:'UNLOCKME'},AK);assert.equal(r.status,200);r=await api('me',null,UT);assert.equal(r.j.user.unlocked.length,PDBP.length);
   assert.equal(r.j.user.cosm.own.length,require('../shared/core.js').COSMETICS.length);assert(r.j.user.cosm.own.includes('wp_beam')&&r.j.user.cosm.own.includes('ar_volcano'));
+  r=await adm('pit',null,AK);assert.equal(r.j.cap,500);r=await adm('pit',{rate:5},AK);assert.equal(r.status,400);r=await adm('pit',{rate:30,cap:300},AK);assert.equal(r.j.cap,300);assert.equal((await adm('pit',null,AK)).j.rate,30);r=await adm('pit',{cap:500,rate:40},AK);
   r=await adm('stats',null,AK);assert.equal(r.status,200);assert.equal(r.j.maint,false);console.log('admin API OK (key required, price override enforced, png prop stored)')}
 // --- cosmetics: validation, buy, equip
  const CB=require('../shared/core.js').COS_BY;
@@ -91,6 +92,12 @@ const wait=(f,ms,what)=>new Promise((res,rej)=>{const t0=Date.now(),h=setInterva
   const me=cs.end.rank.find(x=>x.i==cs.you);assert(me&&me.rank,'rating change sent to client vs bots');assert(me.rank.delta<=5,'EASY bot gains capped');
   const lb=await api('leaderboard',null,S);const row=lb.j.top.find(x=>x.username=='solo');assert(row&&row.games==1,'solo-vs-bot player on leaderboard');assert.equal(row.wins,cs.end.winner==cs.you?1:0);
   console.log('solo vs CPU ranked OK, delta',me.rank.delta,'winner',cs.end.winner==cs.you?'solo':'cpu/draw');clearInterval(cs.bot);cs.ws.close()}
+ // --- MONEY PIT online vs CPU: server rains coins, contributions in results, solo-vs-bot jackpot paid at 25%
+ {r=await api('register',{username:'pitter',password:'pw1234'});const S=r.j.token;const cs=client(S,'pitter');await cs.open;cs.send({t:'create'});await wait(()=>cs.lobby&&!cs.lobby.quick,2000,'pit room');
+  cs.send({t:'rules',mode:'pit',items:0});cs.send({t:'addcpu'});await wait(()=>cs.lobby.slots.filter(Boolean).length==2&&cs.lobby.mode=='pit',2000,'pit lobby');cs.send({t:'start'});await wait(()=>cs.start,3000,'pit start');
+  await wait(()=>cs.end,30000,'pit end');const J=cs.end.rank.reduce((a,x)=>a+(x.pit|0),0),me=cs.end.rank.find(x=>x.i==cs.you);assert(cs.end.rank.every(x=>x.pit!=null),'pit contributions sent');
+  if(cs.end.winner==cs.you&&J>=4)assert.equal(me.bd.jackpot,Math.floor(J/4),'solo jackpot is 25%');else assert(!me.bd.jackpot,'no jackpot unless winner');
+  console.log('money pit online OK, jackpot',J,'paid',me.bd.jackpot|0);clearInterval(cs.bot);cs.ws.close()}
  // --- bracket logic (pure)
  const PC=require('../shared/core.js');for(const n of [4,8]){const b=PC.bracketNew(n);let x,k=0;assert.equal(PC.bracketReport(b,1,0,0),false,'cannot report unfilled match');
   while(x=PC.bracketNext(b)){assert.equal(PC.bracketReport(b,x.r,x.m,99),false,'winner must be a player');assert(PC.bracketReport(b,x.r,x.m,Math.max(x.a,x.b)));assert.equal(PC.bracketReport(b,x.r,x.m,x.a),false,'no double report');k++}
@@ -102,6 +109,11 @@ const wait=(f,ms,what)=>new Promise((res,rej)=>{const t0=Date.now(),h=setInterva
    assert.equal(r,'win','bots finish a match on sky castle');assert.ok(xs.size>10,'platform moves');if(items)assert.ok(hz>0,'lightning strikes with items on');else assert.equal(hz,0,'no hazard when items off')}
   C.startFight([{type:'human',skin:0},{type:'human',skin:1}],A,{items:0});for(let k=0;k<120;k++)C.step(()=>({}));const sx=JSON.parse(JSON.stringify(C.snapX()));const x0=C.mp.x;for(let k=0;k<30;k++)C.step(()=>({}));assert.notEqual(C.mp.x,x0);C.unsnapX(sx);assert.ok(Math.abs(C.mp.x-x0)<.11,'mp snapshot roundtrip');
   console.log('sky castle OK')}
+ {const C=PC.createCore({}),A=C.ARENAS.findIndex(a=>a.name=='MONEY PIT');assert.ok(A>=5,'money pit arena');assert.ok(PC.MODES.some(m=>m.id=='pit'),'pit mode');
+  C.startFight([0,1,2,3].map(i=>({type:'cpu',skin:i})),A,{stocks:2,diff:2,mode:'pit',pitRate:20,pitCap:60});let n=0,r,mx=0;
+  while(n<60*60*6&&!(r=C.step(()=>({})))){n++;mx=Math.max(mx,C.coins.length)}
+  assert.equal(r,'win','pit match ends by last standing');assert.ok(mx>0,'coins rain');const J=C.jackpot;assert.ok(J>0&&J<=60,'jackpot within cap '+J);
+  assert.equal(J,C.F.reduce((a,f)=>a+(f.pts|0),0),'jackpot = sum of contributions');console.log('money pit OK jackpot',J,'winner',C.winner&&C.winner.i)}
  // --- 2v2: private room team picking, then 2V2 quick match with bot fill
  r=await api('register',{username:'bob',password:'pw1234'});const Bt=r.j.token;const c3=client(Bt,'bob');await c3.open;
  c1.start=c1.end=null;c1.lobby=null;c1.send({t:'create'});await wait(()=>c1.lobby&&!c1.lobby.quick,2000,'2v2 room');c1.send({t:'rules',mode:'teams'});

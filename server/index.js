@@ -181,8 +181,8 @@ function startMatch(r){if(ADM.maint)return;r.state='fight';r.countAt=0;r.fillAt=
  r.core=PDB.createCore({sfx:(k,a)=>ev.push(a!=null?['s',k,a]:['s',k]),shake:v=>ev.push(['k',v]),burst:(x,y,c,n,sp)=>{if(ev.length<200)ev.push(['b',Math.round(x),Math.round(y),c,n,sp])},
   part:(x,y)=>{if(ev.length<200)ev.push(['p',Math.round(x),Math.round(y)])},ko:f=>ev.push(['o',f.i,Math.round(f.x),Math.round(f.y),f.lastHit!=null&&f.lastHit!=f.i?f.lastHit:-1]),
   kill:(k,v)=>{if(k!=null&&k!==v&&r.slots[k])r.slots[k].kos++}});
- const slots=r.slots.map(s=>s?{type:s.type,skin:s.skin,name:s.name}:{type:'none'});r.core.startFight(slots,r.arena,Object.assign({},ONLINE_RULES,{mode:r.mode||'stock',items:r.items|0,ff:!!r.ff,teamOf:teamOf(r)},r.q2?{diff:0}:{}));
- viewers(r).forEach(s=>send(s.ws,{t:'start',you:r.slots.indexOf(s),spec:r.slots.indexOf(s)<0,tour:r.tour?{T:r.T,cur:r.cur}:null,teams:teamOf(r),slots:r.slots.map(s=>s?{type:s.type,skin:s.skin,name:s.name,cos:s.cos||{},team:s.team}:null),th:roomTheme(r),arena:r.arena,stocks:ONLINE_RULES.stocks,mode:r.core.opts.mode,time:r.core.opts.time,items:r.items|0,ff:!!r.ff}));
+ const slots=r.slots.map(s=>s?{type:s.type,skin:s.skin,name:s.name}:{type:'none'});if(r.mode=='pit'&&!ADM.pit.on)r.mode='stock';r.core.startFight(slots,r.arena,Object.assign({},ONLINE_RULES,{pitRate:ADM.pit.rate,pitCap:ADM.pit.cap,mode:r.mode||'stock',items:r.items|0,ff:!!r.ff,teamOf:teamOf(r)},r.q2?{diff:0}:{}));
+ viewers(r).forEach(s=>send(s.ws,{t:'start',you:r.slots.indexOf(s),spec:r.slots.indexOf(s)<0,tour:r.tour?{T:r.T,cur:r.cur}:null,pitCap:ADM.pit.cap,teams:teamOf(r),slots:r.slots.map(s=>s?{type:s.type,skin:s.skin,name:s.name,cos:s.cos||{},team:s.team}:null),th:roomTheme(r),arena:r.arena,stocks:ONLINE_RULES.stocks,mode:r.core.opts.mode,time:r.core.opts.time,items:r.items|0,ff:!!r.ff}));
  startLoop(r)}
 // Fixed-step 60 Hz loop: setInterval(16.67) really fires every ~16ms (62.5 Hz) and drifts/bunches on a shared CPU, which made the
 // client playback clock fall behind and jump. Track real time with an accumulator, catch up at most 4 steps, then resync.
@@ -200,7 +200,10 @@ function endMatch(r){clearTimeout(r.loop);r.loop=null;r.ending=true;finishMatch(
 async function finishMatch(r){const c=r.core,w=c.winner;
  const all=c.rank(),rank=[];
  for(const f of all){const s=r.slots[f.i];let coins=0,bd=null;if(s&&s.type=='human'&&s.uid){const place=all.indexOf(f),won=w&&w.i==f.i;bd={part:REWARD.part,ko:REWARD.ko*Math.min(s.kos,9),place:w?REWARD.place[place]||0:0};coins=await grant(s.uid,'online',bd.part+bd.ko+bd.place);if(won)coins+=(bd.firstWin=await onceToday(s.uid,'firstwin',REWARD.firstWin))}
-  if(s&&s.type=='human'&&s.uid&&s.ws){s.chal=await chalProgress(s.uid,{won:!!(w&&w.i==f.i),kos:s.kos,online:true,flawless:!!(w&&w.i==f.i)&&f.stocks>=ONLINE_RULES.stocks,players:all.length,mode:r.mode||'stock'})}rank.push({i:f.i,name:s?s.name:'?',skin:f.skin,kos:s?s.kos:0,coins,bd})}
+  if(s&&s.type=='human'&&s.uid&&s.ws){s.chal=await chalProgress(s.uid,{won:!!(w&&w.i==f.i),kos:s.kos,online:true,flawless:!!(w&&w.i==f.i)&&f.stocks>=ONLINE_RULES.stocks,players:all.length,mode:r.mode||'stock'})}if(r.mode=='pit'&&!r.tour&&w&&w.i==f.i&&s&&s.type=='human'&&s.uid&&bd){const J=c.jackpot|0,hum=r.slots.filter(x=>x&&x.type=='human'&&x.uid).length;
+   // anti-farm: jackpot only pays in full when another human was in the match; vs bots/solo it pays 25%
+   const pay=hum>=2?J:Math.floor(J/4);if(pay>0){bd.jackpot=await grant(s.uid,'pit',pay);coins+=bd.jackpot}}
+  rank.push({i:f.i,name:s?s.name:'?',skin:f.skin,kos:s?s.kos:0,coins,bd,pit:r.mode=='pit'?f.pts|0:undefined})}
  if(!r.tour){const rt=await rateMatch(all.map((f,k)=>{const s=r.slots[f.i];return {uid:s&&s.type=='human'&&s.ws?s.uid:null,guest:s&&s.ws&&s.ws.user.guest,bot:!!(s&&s.type=='cpu'),place:w?k:0,won:!!(w&&w.i==f.i)}}),r.core&&r.core.opts?r.core.opts.diff:0);rank.forEach(x=>{const s=r.slots[x.i];if(s&&s.uid&&rt[s.uid])x.rank=rt[s.uid]})}
  for(const s of viewers(r)){const u=await q.byId(s.uid);if(!u||!s.ws)continue;s.ws.user=u;send(s.ws,{t:'end',tour:!!r.tour,chal:s.chal||[],winner:w?w.i:null,rank,coins:u.coins});send(s.ws,{t:'user',user:pub(u)})}}
 function afterMatch(r){if(r.tour&&r.ent)return tourAfter(r);r.state='lobby';r.core=null;r.slots=r.slots.map(s=>!s||s.type!='human'||!s.ws?(r.quick||!s?null:s.type=='cpu'&&!s.uid?s:null):Object.assign(s,{kos:0,inp:{b:0,e:0},chal:null}));
@@ -252,7 +255,7 @@ wss.on('connection',(ws,req)=>{const tok=new URL(req.url,'http://x').searchParam
    case 'skin':{if(!r||r.state!='lobby')break;const s=r.slots.find(s=>s&&s.ws===ws);const k=m.skin;if(!s||!Number.isInteger(k))break;
     let u;try{u=await q.byId(ws.user.id)}catch(e){break}if(!u)break;ws.user=u;const un=JSON.parse(u.unlocked);if(!un.includes(k)){send(ws,{t:'err',m:'SKIN LOCKED'});break}if(ws.room!==r||r.state!='lobby')break;s.skin=k;ws.pref=k;pushLobby(r);break}
    case 'arena':if(r&&!r.quick&&r.host===ws&&r.state=='lobby'&&Number.isInteger(m.arena)&&m.arena>=0&&m.arena<PDB.ARENAS_N){r.arena=m.arena;r.fixedArena=true;pushLobby(r)}break;
-   case 'rules':if(r&&!r.quick&&r.host===ws&&r.state=='lobby'){if(PDB.MODES.some(x=>x.id==m.mode))r.mode=m.mode;if(Number.isInteger(m.items)&&m.items>=0&&m.items<4)r.items=m.items;if(r.tour&&(m.tsize===4||m.tsize===8))r.tsize=m.tsize;if(m.ff!=null)r.ff=!!m.ff;pushLobby(r)}break;
+   case 'rules':if(r&&!r.quick&&r.host===ws&&r.state=='lobby'){if(PDB.MODES.some(x=>x.id==m.mode)&&!(m.mode=='pit'&&!ADM.pit.on))r.mode=m.mode;if(Number.isInteger(m.items)&&m.items>=0&&m.items<4)r.items=m.items;if(r.tour&&(m.tsize===4||m.tsize===8))r.tsize=m.tsize;if(m.ff!=null)r.ff=!!m.ff;pushLobby(r)}break;
    case 'addcpu':if(r&&!r.quick&&r.host===ws&&r.state=='lobby'){addCPU(r);pushLobby(r)}break;
    case 'delcpu':if(r&&!r.quick&&r.host===ws&&r.state=='lobby'){for(let i=r.slots.length-1;i>=0;i--)if(r.slots[i]&&r.slots[i].type=='cpu'){r.slots[i]=null;break}pushLobby(r)}break;
    case 'start':if(r&&!r.quick&&r.host===ws&&r.state=='lobby'){if(r.tour)tourStart(r);else if(r.slots.filter(Boolean).length<2)send(ws,{t:'err',m:'NEED 2+ FIGHTERS'});else startMatch(r)}break;

@@ -72,7 +72,7 @@ function drawModeWorld(){const md=CORE.opts&&CORE.opts.mode,Hh=CORE.hill;
  if(md=='koth'&&Hh){const who=Hh.who,c=who>=0?PCOL[who]:who==-2?'#ffffff':'#fee761';ctx.globalAlpha=.18+.06*Math.sin(t/8);ctx.fillStyle=c;ctx.fillRect(Hh.x,Hh.y,Hh.w,Hh.h);ctx.globalAlpha=1;ctx.fillStyle=c;
   for(let x=Hh.x;x<Hh.x+Hh.w;x+=4){ctx.fillRect(x,Hh.y+Hh.h-2,2,2);if((x+t>>2)%3==0)ctx.fillRect(x,Hh.y+Hh.h-6-((t+x)%20),1,1)}ctx.fillRect(Hh.x,Hh.y,1,Hh.h);ctx.fillRect(Hh.x+Hh.w-1,Hh.y,1,Hh.h);
   ctx.fillStyle=PAL.o;ctx.fillRect(Hh.x+Hh.w/2-1,Hh.y-10,2,12);ctx.fillStyle=c;ctx.fillRect(Hh.x+Hh.w/2+1,Hh.y-10,8,5)}
- if(md=='coin')for(const c of CORE.coins){const x=Math.round(c.x),y=Math.round(c.y),w=[6,4,2,4][Math.floor(t/6)%4];ctx.fillStyle=PAL.o;ctx.fillRect(x+4-w/2-1,y-1,w+2,10);ctx.fillStyle='#fee761';ctx.fillRect(x+4-w/2,y,w,8);ctx.fillStyle='#ffffff';ctx.fillRect(x+4-w/2,y+1,1,3)}
+ if(md=='coin'||md=='pit')for(const c of CORE.coins){const x=Math.round(c.x),y=Math.round(c.y),w=[6,4,2,4][Math.floor(t/6)%4];ctx.fillStyle=PAL.o;ctx.fillRect(x+4-w/2-1,y-1,w+2,10);ctx.fillStyle='#fee761';ctx.fillRect(x+4-w/2,y,w,8);ctx.fillStyle='#ffffff';ctx.fillRect(x+4-w/2,y+1,1,3)}
  if(md=='teams')for(const f of F){if(f.out||f.respawn>0)continue;ctx.fillStyle=TEAMC[f.team&1];ctx.fillRect(Math.round(f.x)-1,Math.round(f.y)+21,12,2)}}
 const _drawItems0=drawItems;drawItems=function(){drawModeWorld();_drawItems0()};
 

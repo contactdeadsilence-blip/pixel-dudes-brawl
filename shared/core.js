@@ -3,7 +3,7 @@
 const PRICES=[0,0,0,0,200,200,200,250,250,250,300,300,300,350,350,350,400,400,450,450,500];
 const STARTER=[0,1,2,3];
 const TIERS=[['BRONZE',0,'#c77b3f'],['SILVER',1100,'#c0c8d8'],['GOLD',1200,'#fee761'],['PLATINUM',1300,'#7fe0d0'],['DIAMOND',1400,'#8fb8ff']];
-const MODES=[{id:'stock',n:'STOCK',d:'LAST ONE STANDING'},{id:'time',n:'TIME',d:'MOST KOS WHEN TIME RUNS OUT'},{id:'koth',n:'KING OF THE HILL',d:'HOLD THE ZONE FOR 15 SECONDS'},{id:'teams',n:'TEAMS 2V2',d:'P1+P3 VS P2+P4'},{id:'coin',n:'COIN RUSH',d:'FIRST TO 15 COINS'}];
+const MODES=[{id:'stock',n:'STOCK',d:'LAST ONE STANDING'},{id:'time',n:'TIME',d:'MOST KOS WHEN TIME RUNS OUT'},{id:'koth',n:'KING OF THE HILL',d:'HOLD THE ZONE FOR 15 SECONDS'},{id:'teams',n:'TEAMS 2V2',d:'P1+P3 VS P2+P4'},{id:'coin',n:'COIN RUSH',d:'FIRST TO 15 COINS'},{id:'pit',n:'MONEY PIT',d:'GRAB RAINING COINS - LAST ONE STANDING WINS THE JACKPOT'}];
 const CHALLENGES=[{id:'play3',txt:'PLAY 3 MATCHES',n:3,r:40,k:'play'},{id:'kos10',txt:'LAND 10 KOS',n:10,r:50,k:'kos'},{id:'win2',txt:'WIN 2 MATCHES',n:2,r:60,k:'win'},
  {id:'onl2',txt:'PLAY 2 ONLINE MATCHES',n:2,r:50,k:'online'},{id:'owin',txt:'WIN AN ONLINE MATCH',n:1,r:80,k:'owin'},{id:'koth1',txt:'PLAY KING OF THE HILL',n:1,r:40,k:'mode',m:'koth'},{id:'coinw',txt:'WIN A COIN RUSH',n:1,r:70,k:'modewin',m:'coin'},{id:'team2',txt:'PLAY 2 TEAM MATCHES',n:2,r:50,k:'mode',m:'teams'},
  {id:'kos3m',txt:'GET 3 KOS IN ONE MATCH',n:1,r:60,k:'kos3'},
@@ -16,11 +16,13 @@ const COSMETICS=[
  {id:'hat_cap',cat:'hat',n:'BALL CAP',p:150},{id:'hat_band',cat:'hat',n:'HEADBAND',p:150},{id:'hat_viking',cat:'hat',n:'VIKING HELM',p:250},{id:'hat_top',cat:'hat',n:'TOP HAT',p:300},
  {id:'hat_wizard',cat:'hat',n:'WIZARD HAT',p:350},{id:'hat_crown',cat:'hat',n:'CROWN',p:500},{id:'hat_halo',cat:'hat',n:'HALO',p:600},
  {id:'tr_fire',cat:'trail',n:'FIRE TRAIL',p:200},{id:'tr_ice',cat:'trail',n:'ICE TRAIL',p:200},{id:'tr_spark',cat:'trail',n:'SPARKLE TRAIL',p:300},{id:'tr_rainbow',cat:'trail',n:'RAINBOW TRAIL',p:500},
+ {id:'tr_bubble',cat:'trail',n:'BUBBLE TRAIL',p:250},{id:'tr_hearts',cat:'trail',n:'HEART TRAIL',p:300},{id:'tr_volt',cat:'trail',n:'VOLT TRAIL',p:350},{id:'tr_smoke',cat:'trail',n:'SHADOW SMOKE',p:350},{id:'tr_star',cat:'trail',n:'STARDUST TRAIL',p:400},{id:'tr_glitch',cat:'trail',n:'GLITCH TRAIL',p:450},
  {id:'ko_confetti',cat:'ko',n:'CONFETTI KO',p:250},{id:'ko_bolt',cat:'ko',n:'LIGHTNING KO',p:350},{id:'ko_boom',cat:'ko',n:'PIXEL BOOM KO',p:500},
+ {id:'ko_hearts',cat:'ko',n:'HEARTBREAK KO',p:300},{id:'ko_ghost',cat:'ko',n:'GHOST KO',p:350},{id:'ko_shatter',cat:'ko',n:'SHATTER KO',p:400},{id:'ko_firework',cat:'ko',n:'FIREWORKS KO',p:450},{id:'ko_skull',cat:'ko',n:'SKULL KO',p:500},{id:'ko_hole',cat:'ko',n:'BLACK HOLE KO',p:600},
  {id:'po_jump',cat:'pose',n:'VICTORY HOP',p:200},{id:'po_spin',cat:'pose',n:'SPIN',p:250},{id:'po_dance',cat:'pose',n:'DANCE',p:300},{id:'po_trophy',cat:'pose',n:'TROPHY RAISE',p:400},
  {id:'nc_gold',cat:'name',n:'GOLD NAME',p:100,c:'#fee761'},{id:'nc_mint',cat:'name',n:'MINT NAME',p:100,c:'#7fe0d0'},{id:'nc_pink',cat:'name',n:'PINK NAME',p:150,c:'#ff8ad0'},
  {id:'nc_sky',cat:'name',n:'SKY NAME',p:150,c:'#8fb8ff'},{id:'nc_fire',cat:'name',n:'FIRE NAME',p:200,c:'#f99252'},{id:'nc_rainbow',cat:'name',n:'RAINBOW NAME',p:300,c:'rainbow'},
- {id:'ar_night',cat:'arena',n:'NIGHT MEADOW',p:400,base:0,th:5},{id:'ar_volcano',cat:'arena',n:'VOLCANO TOWERS',p:700,base:1,th:6},
+ {id:'ar_night',cat:'arena',n:'NIGHT MEADOW',p:400,base:0,th:6},{id:'ar_volcano',cat:'arena',n:'VOLCANO TOWERS',p:700,base:1,th:7},
  // melee weapons: purely visual (damage/hitboxes unchanged)
  {id:'wp_bat',cat:'weapon',n:'BASEBALL BAT',p:200},{id:'wp_wrench',cat:'weapon',n:'WRENCH',p:250},{id:'wp_sword',cat:'weapon',n:'SWORD',p:300},{id:'wp_spear',cat:'weapon',n:'SPEAR',p:350},
  {id:'wp_axe',cat:'weapon',n:'BATTLE AXE',p:400},{id:'wp_hammer',cat:'weapon',n:'WAR HAMMER',p:450},{id:'wp_katana',cat:'weapon',n:'KATANA',p:600},{id:'wp_beam',cat:'weapon',n:'BEAM SABER',p:800}];
@@ -54,7 +56,8 @@ const ARENAS=[
 {name:'BRICK TOWERS',map:build(60,34,[['#',6,53,26,27],['#',9,50,28,28],['#',13,46,29,29],['=',14,16,22,25],['=',43,45,22,25],['-',6,13,19,19],['-',46,53,19,19],['=',24,35,18,18],['-',20,23,22,22],['-',36,39,22,22],['-',17,23,15,15],['-',36,42,15,15],['-',9,16,11,11],['-',43,50,11,11],['=',28,31,10,10],['-',25,34,6,6]]),sp:[[10,26],[22,26],[37,26],[49,26]],rs:[30,2]},
 {name:'SKY ISLANDS',map:build(60,34,[['#',3,15,20,20],['#',4,14,21,21],['#',6,12,22,22],['#',44,56,20,20],['#',45,55,21,21],['#',47,53,22,22],['#',21,38,25,25],['#',22,37,26,26],['#',25,34,27,27],['#',27,32,28,28],['-',24,35,20,20],['-',17,22,15,15],['-',37,42,15,15],['#',9,14,11,11],['#',45,50,11,11],['-',26,33,11,11]]),sp:[[8,20],[25,25],[34,25],[51,20]],rs:[30,3]},
 {name:'GRAND BRIDGE',map:build(72,38,[['#',3,22,24,27],['#',5,20,28,29],['#',8,17,30,30],['#',49,68,24,27],['#',51,66,28,29],['#',54,63,30,30],['-',23,48,24,24],['#',29,42,31,31],['#',31,40,32,32],['-',8,16,19,19],['-',55,63,19,19],['=',33,38,19,19],['-',25,31,14,14],['-',40,46,14,14],['-',11,18,12,12],['-',53,60,12,12],['-',32,39,9,9]]),sp:[[8,24],[19,24],[52,24],[63,24]],rs:[36,3]},
-{name:'SKY CASTLE',map:build(60,34,[['#',14,45,26,27],['#',16,43,28,28],['#',19,40,29,29],['#',22,37,30,30],['=',14,15,22,25],['=',44,45,22,25],['-',18,25,20,20],['-',34,41,20,20],['-',26,33,13,13]]),sp:[[18,26],[26,26],[33,26],[41,26]],rs:[30,3],mp:{x0:6,x1:48,y:17,w:6,v:.6},hz:1}];
+{name:'SKY CASTLE',map:build(60,34,[['#',14,45,26,27],['#',16,43,28,28],['#',19,40,29,29],['#',22,37,30,30],['=',14,15,22,25],['=',44,45,22,25],['-',18,25,20,20],['-',34,41,20,20],['-',26,33,13,13]]),sp:[[18,26],[26,26],[33,26],[41,26]],rs:[30,3],mp:{x0:6,x1:48,y:17,w:6,v:.6},hz:1},
+{name:'MONEY PIT',map:build(60,34,[['#',9,50,26,27],['#',11,48,28,28],['#',14,45,29,29],['#',9,11,23,25],['#',48,50,23,25],['-',16,23,21,21],['-',36,43,21,21],['-',25,34,15,15],['-',12,17,13,13],['-',42,47,13,13]]),sp:[[16,26],[25,26],[34,26],[43,26]],rs:[30,3],pit:1}];
 let MP=null,HZ=null;
 function mpOn(o){return MP&&o.dropT<=0&&Math.abs(o.y+o.h-MP.y)<.6&&o.x+o.w>MP.x&&o.x<MP.x+MP.w}
 function stepMP(){if(!MP)return;const nx=MP.x+MP.vx;if(nx<MP.a||nx>MP.b)MP.vx=-MP.vx;const dx=MP.vx;for(const f of F)if(!f.out&&f.respawn<=0&&f.vy>=0&&mpOn(f)){f.x+=dx;if(overlapSolid(f))f.x-=dx}MP.x+=dx}
@@ -122,7 +125,7 @@ function aiRaw(f,P){const DF=P.df;const o={l:0,r:0,u:0,d:0,upE:0,dE:0,ap:0,sp:0,
  let tg=null,bd=1e9;for(const g of F){if(g==f||g.out||g.respawn>0||friendly(f,g)||(opts.teams&&g.team==f.team))continue;const d=Math.hypot(g.x-f.x,g.y-f.y);if(d<bd){bd=d;tg=g}}if(!tg)return o;
  {const P=(x,y)=>({x,y,w:10,h:20,dmg:0,vx:0,vy:0,ground:true,pseudo:1});
   if(opts.mode=='koth'&&HILL&&!ov(f,HILL)&&(bd>36||(f.i+(tick>>7))%3))tg=P(HILL.x+HILL.w/2-5,HILL.y+HILL.h-20);
-  if(opts.mode=='coin'){let bc=null,cd=bd>40?320:90;for(const c of CO){const d=Math.hypot(c.x-f.x,c.y-f.y);if(d<cd){cd=d;bc=c}}if(bc)tg=P(bc.x-1,bc.y-12)}}
+  if(opts.mode=='coin'||opts.mode=='pit'){let bc=null,cd=opts.mode=='pit'?(bd>80?150:40):bd>40?320:90;for(const c of CO){const d=Math.hypot(c.x-f.x,c.y-f.y);if(d<cd){cd=d;bc=c}}if(bc)tg=P(bc.x-1,bc.y-12)}}
  const dx=tg.x-f.x+(tg.pseudo?0:(A.err||0)),dy=tg.y-f.y,R=Math.random()/DF;
  if(Math.abs(dx)>12){if(dx>0)o.r=1;else o.l=1}
  if(f.ground&&(o.r||o.l)){const nx=cx+(o.r?14:-14);if(groundBelow(nx,feet)<0){if(tg.y+tg.h<=feet+8&&Math.abs(dx)<260&&A.j<=0&&groundBelow(cx+(o.r?1:-1)*Math.min(Math.abs(dx),150),feet-40)>=0){o.upE=1;A.j=25;A.gapDir=o.r?1:-1;A.gapT=50}else o.l=o.r=0}}
@@ -164,10 +167,13 @@ function koScore(f){const k=f.lastHit!=null&&f.lastHit!=f.i?F.find(g=>g.i==f.las
 function stepModes(){if(readyT>0||endT)return;const m=opts.mode;
  if(m=='koth'){if(--hillT<=0){pickHill();hillT=1200;SFX.count()}const ins=F.filter(f=>!f.out&&f.respawn<=0&&ov(f,HILL));HILL.who=ins.length==1?ins[0].i:(ins.length?-2:-1);
   if(ins.length==1){const f=ins[0];f.pts++;if(f.pts>=KOTH_GOAL){winner=f;endT=90;SFX.game()}}}
- if(m=='coin'){if(--coinT<=0){coinT=75;if(CO.length<6){const x=stageL+12+rnd()*(stageR-stageL-24);if(groundBelow(x,0)>=0)CO.push({x,y:Math.max(-40,stageTop-180),vy:0,w:8,h:8,life:900})}}
+ if(m=='pit'&&--coinT<=0){coinT=Math.max(10,opts.pitRate|0||40);if(CO.length<12&&jackpot()<pitCap()){const x=stageL+16+rnd()*(stageR-stageL-32);CO.push({x,y:Math.max(-60,stageTop-200)-rnd()*40,vy:0,w:8,h:8,life:600})}}
+ if(m=='coin'||m=='pit'){if(m=='coin'&&--coinT<=0){coinT=75;if(CO.length<6){const x=stageL+12+rnd()*(stageR-stageL-24);if(groundBelow(x,0)>=0)CO.push({x,y:Math.max(-40,stageTop-180),vy:0,w:8,h:8,life:900})}}
   for(let n=CO.length-1;n>=0;n--){const c=CO[n];c.life--;if(c.vy>=0&&tileAt(c.x+4,c.y+c.h+c.vy+.1)!=' '&&tileAt(c.x+4,c.y+c.h-.1)==' '){c.y=Math.floor((c.y+c.h+c.vy+.1)/T)*T-c.h;c.vy=0}else{c.vy=Math.min(4,c.vy+.25);c.y+=c.vy}
    if(c.life<=0||c.y>WH+20){CO.splice(n,1);continue}
-   for(const f of F){if(f.out||f.respawn>0)continue;if(ov(c,f)){f.pts++;SFX.coin();burst(c.x+4,c.y+4,'#fee761',6,1.2);CO.splice(n,1);if(f.pts>=COIN_GOAL&&!endT){winner=f;endT=90;SFX.game()}break}}}}}
+   for(const f of F){if(f.out||f.respawn>0)continue;if(ov(c,f)){if(m!='pit'||jackpot()<pitCap())f.pts++;SFX.coin();burst(c.x+4,c.y+4,'#fee761',6,1.2);CO.splice(n,1);if(m=='coin'&&f.pts>=COIN_GOAL&&!endT){winner=f;endT=90;SFX.game()}break}}}}}
+function pitCap(){return Math.max(10,Math.min(5000,opts.pitCap|0||500))}
+function jackpot(){let s=0;for(const f of F)s+=f.pts|0;return Math.min(s,pitCap())}
 function score(f){return endless()?f.pts:(f.out?0:f.stocks)}
 function rank(){return F.slice().sort((a,b)=>score(b)-score(a)||a.dmg-b.dmg)}
 function step(getInp){tick++;if(readyT>0){readyT--;if(readyT==99||readyT==65)SFX.count();if(readyT==30)SFX.go()}
@@ -181,7 +187,7 @@ function snap(){return F.map(f=>[Math.round(f.x*10),Math.round(f.y*10),Math.roun
 function snapX(){return {I:IT.map(i=>[i.k,Math.round(i.x),Math.round(i.y),i.life]),P:PR.map(p=>[Math.round(p.x),Math.round(p.y),p.orb?p.o+1:0]),S:F.map(f=>[f.spT>0?'udswn'.indexOf(f.spK)+1:0,f.spT|0,f.spCd|0]),M:[HILL?[HILL.x,HILL.y,HILL.w,HILL.h,HILL.who|0]:0,CO.map(c=>[Math.round(c.x),Math.round(c.y)]),F.map(f=>f.pts|0),F.map(f=>f.team),MP?[Math.round(MP.x*10),Math.sign(MP.vx)]:0,HZ?[HZ.ph,HZ.t,HZ.x]:0],B:F.map(f=>(f.buf.spd>0?1:0)|(f.buf.sh>0?2:0)|(f.buf.ham>0?4:0)|(f.buf.bomb?8:0))}}
 function unsnapX(o){if(!o)return;IT=(o.I||[]).map(a=>({k:a[0],x:a[1],y:a[2],w:10,h:10,vy:0,life:a[3]}));PR=(o.P||[]).map(a=>({x:a[0],y:a[1],orb:a[2]?1:0,o:a[2]-1}));(o.S||[]).forEach((a,k)=>{const f=F[k];if(f){f.spK=a[0]?'udswn'[a[0]-1]:'';f.spT=a[1];f.spCd=a[2]}});if(o.M){const M=o.M;HILL=M[0]?{x:M[0][0],y:M[0][1],w:M[0][2],h:M[0][3],who:M[0][4]}:null;CO=M[1].map(a=>({x:a[0],y:a[1],w:8,h:8}));M[2].forEach((p,k)=>{if(F[k])F[k].pts=p});M[3].forEach((t,k)=>{if(F[k])F[k].team=t});if(MP&&M[4]){MP.x=M[4][0]/10;MP.vx=Math.abs(MP.vx)*M[4][1]}if(HZ&&M[5]){HZ.ph=M[5][0];HZ.t=M[5][1];HZ.x=M[5][2]}}(o.B||[]).forEach((b,k)=>{const f=F[k];if(f)f.buf={spd:b&1,sh:b&2?1:0,ham:b&4?1:0,bomb:b&8?1:0}})}
 function unsnap(a,f){f.x=a[0]/10;f.y=a[1]/10;f.vx=a[2]/10;f.vy=a[3]/10;f.face=a[4];f.dmg=a[5];f.stocks=a[6];f.out=!!(a[7]&1);f.ground=!!(a[7]&2);f.cpu=!!(a[7]&4);f.respawn=a[8];f.inv=a[9];f.atkT=a[10];f.dashT=a[11];f.hitstun=a[12];f.flash=a[13];return f}
-return{ARENAS,T,PCOL,startFight,step,hitbox,onGround,snap,unsnap,snapX,unsnapX,rank,ITEM_KINDS,get items(){return IT},get hill(){return HILL},get coins(){return CO},get hillT(){return hillT},score,MODES,KOTH_GOAL,COIN_GOAL,get projs(){return PR},get mp(){return MP},get hz(){return HZ},
+return{ARENAS,T,PCOL,startFight,step,hitbox,onGround,snap,unsnap,snapX,unsnapX,rank,ITEM_KINDS,get items(){return IT},get hill(){return HILL},get coins(){return CO},get jackpot(){return opts.mode=='pit'?jackpot():0},get pitCap(){return pitCap()},get hillT(){return hillT},score,MODES,KOTH_GOAL,COIN_GOAL,get projs(){return PR},get mp(){return MP},get hz(){return HZ},
  get F(){return F},get map(){return map},get arena(){return arena},get WW(){return WW},get WH(){return WH},get readyT(){return readyT},get endT(){return endT},get winner(){return winner},get hitstop(){return hitstop},get timer(){return timer},get tick(){return tick},get opts(){return opts},
  setCPU(i,v){const f=F.find(f=>f.i==i);if(f)f.cpu=v}}}
 const api={createCore,PRICES,STARTER,TIERS,tierOf,CHALLENGES,chalAdd,ITEM_KINDS,ITEM_NAMES,MODES,COSMETICS,COS_CATS,COS_BY,cosParse,get ARENAS_N(){return this._an||(this._an=createCore({}).ARENAS.length)},bracketNew,bracketNext,bracketReport,bracketChamp,bracketRound};

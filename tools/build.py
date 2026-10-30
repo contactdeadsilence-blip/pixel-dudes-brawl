@@ -94,7 +94,7 @@ rest+="\nfunction hudName(f){if(state=='ofight'||state=='oresult'){const n=(NET.
 tail=rng(238,246).replace('arenaPrev=ARENAS.map(a=>{','arenaPrev=ARENAS.map((a,ai)=>{').replace('ctx.drawImage(bgCanvas(),0,0,c.width,c.height)','ctx.drawImage(bgCanvas(ai),0,0,c.width,c.height)').replace("if(showFPS)","if(SET.fps)").replace("window.__game={","window.__game={get NET(){return NET},get ACC(){return ACC},SET,CORE,saveSet,setState:s=>state=s,get W(){return W},get H(){return H},")
 tail=tail.replace("Promise.all(imgs.map","applySet();\nPromise.all(imgs.map")
 def client(online):
-  return '\n'.join([L[0],L[1].replace('const W=480,H=270,','let W=480,H=270;const ').replace(';const T=16',';const T=16') ,"const ONLINE="+('true' if online else 'false')+";",L[2],L[3],L[4],src('audio.js'),art,src('themes.js'),rng(9,12),src('glue.js'),inp,'// ===== State =====',st,sf,rest,src('ui.js'),src('extra.js'),src('cosm.js'),src('tour.js')+src('sky.js'),src('title.js'),tail])
+  return '\n'.join([L[0],L[1].replace('const W=480,H=270,','let W=480,H=270;const ').replace(';const T=16',';const T=16') ,"const ONLINE="+('true' if online else 'false')+";",L[2],L[3],L[4],src('audio.js'),art,src('themes.js'),rng(9,12),src('glue.js'),inp,'// ===== State =====',st,sf,rest,src('ui.js'),src('extra.js'),src('cosm.js'),src('tour.js')+src('sky.js')+src('pit.js'),src('title.js'),tail])
 head=open(R+'/head.html').read().replace('<style>html,body{margin:0;background:#111;height:100%;display:flex;align-items:center;justify-content:center}canvas{image-rendering:pixelated;width:960px;height:540px;max-width:100vw;max-height:56.25vw}</style>',
  '<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><style>html,body{margin:0;padding:0;background:#000;width:100%;height:100%;overflow:hidden}canvas{position:fixed;left:0;top:0;display:block;image-rendering:pixelated;image-rendering:crisp-edges;width:100vw;height:100vh}</style>')
 assert 'overflow:hidden' in head
@@ -123,6 +123,9 @@ def post(js):
   X("'REMATCH'],[[PB('B')],'MENU']],W/2,196)","'REMATCH'],[[PB('B')],'MENU']],W/2,207)",1)
   X("'REMATCH'],[[KC('ESC')],'MENU']],W/2,196)","'REMATCH'],[[KC('ESC')],'MENU']],W/2,207)",1)
   X("x+72,y+62,'#f99252',8,'center')","x+72,y+58,'#f99252',8,'center')",1)
+  # ---- cosmetic particle shapes / per-particle gravity + effect layer (render only)
+  X("for(const p of parts){ctx.fillStyle=p.c;const s=p.l>15?2:1;ctx.fillRect(Math.round(p.x),Math.round(p.y),s,s)}","for(const p of parts)drawP(p);drawFX(FXL)",1)
+  X("p.vy+=.08;p.vx*=.96","p.vy+=(p.g!=null?p.g:.08);p.vx*=.96",1)
   return js
 
 for online,out in [(True,P+'/public/index.html'),(False,'/workspace/pixel-platformer/index.html')]:

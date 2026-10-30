@@ -4,6 +4,10 @@
 <div id="login"><input id="key" type="password" placeholder="ADMIN_KEY" size="40"> <button onclick="saveKey()">Unlock</button></div>
 <div id="msg"></div><div id="main" hidden>
 <h2>Server</h2><div class="box"><div id="stats"></div><button onclick="stats()">Refresh</button>
+ <p>MONEY PIT mode: <b id="pt"></b> <button onclick="pit({on:true})">ON</button><button onclick="pit({on:false})">OFF</button>
+  &nbsp; Coin drop every <input id="prate" type="number" min="10" max="300" style="width:60px"> frames (60 = 1 second, lower = more coins)
+  &nbsp; Jackpot cap <input id="pcap" type="number" min="10" max="2000" style="width:70px"> coins <button onclick="pit({rate:+$('prate').value,cap:+$('pcap').value})">SAVE</button><br>
+  <small>Winner of an online MONEY PIT match gets the jackpot as real coins (25% if no other human player was in the match). Changes apply to the next match.</small></p>
  <p>Maintenance (blocks new matches): <b id="mt"></b> <button onclick="maint(true)">ON</button><button onclick="maint(false)">OFF</button></p>
  <p>Broadcast banner: <input id="bc" maxlength="60" size="40"> <button onclick="bcast()">Send</button> <button onclick="bc.value='';bcast()">Clear</button></p>
 <p>Unlock everything for user: <input id="uu" maxlength="24"> <button onclick="unlockAll()">Unlock everything</button></p></div>
@@ -17,9 +21,11 @@ async function api(p,b){const r=await fetch('/api/admin/'+p,{method:b?'POST':'GE
  if(r.status==401||r.status==503){$('main').hidden=true;$('login').hidden=false;say(j.error||'denied',1);throw 0}if(!r.ok){say(j.error||'error',1);throw 0}return j}
 function saveKey(){K=$('key').value;sessionStorage.setItem('ak',K);boot()}
 const esc=s=>String(s).replace(/[&<>"]/g,c=>'&#'+c.charCodeAt(0)+';');
-async function stats(){const s=await api('stats');$('mt').textContent=s.maint?'ON':'OFF';$('bc').value=s.banner||'';
+async function stats(){pitLoad().catch(()=>{});const s=await api('stats');$('mt').textContent=s.maint?'ON':'OFF';$('bc').value=s.banner||'';
  $('stats').innerHTML=`<p>Online: <b>${s.online}</b> &nbsp; Rooms: <b>${s.rooms.length}</b> &nbsp; Accounts: <b>${s.users}</b></p><table><tr><th>id</th><th>player</th><th>room</th><th></th></tr>`+
  s.players.map(p=>`<tr><td>${p.id}</td><td>${esc(p.name)}</td><td>${p.room||'-'}</td><td><button onclick="kick(${p.id})">Kick</button></td></tr>`).join('')+'</table>'}
+async function pitLoad(){const p=await api('pit');$('pt').textContent=p.on?'ON':'OFF';$('prate').value=p.rate;$('pcap').value=p.cap}
+async function pit(b){const p=await api('pit',b);if(p&&p.error)return say(p.error);say('Money Pit saved');pitLoad()}
 async function maint(on){await api('maintenance',{on});say('Maintenance '+(on?'ON':'OFF'));stats()}
 async function bcast(){await api('broadcast',{msg:$('bc').value});say('Banner set');}
 async function unlockAll(){const u=$('uu').value.trim();if(!u||!confirm('Unlock everything for '+u+'?'))return;const r=await api('unlock-all',{username:u});say('Unlocked '+r.skins+' skins + '+r.items+' items for '+r.username)}

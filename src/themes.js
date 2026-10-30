@@ -60,6 +60,11 @@ const THEMES=[
    tw(.15,60,'#8c9ee0','#7488d0',64,3);for(let i=0;i<7;i++){const x=Math.floor(((i*170-camX*.25)%1190+1190)%1190-60),y=24+(i*53)%110;ctx.drawImage(SNOWCLOUD,x,y)}
    tw(.4,34,'#6a78c0','#e08a9a',90,11);ctx.fillStyle='rgba(255,255,255,.5)';for(let i=0;i<5;i++){const x=Math.floor(((i*230-camX*.6)%1150+1150)%1150-80);ctx.fillRect(x,H-24-(i%2)*8,60,6);ctx.fillRect(x+8,H-28-(i%2)*8,40,4)}},thumb:'#6e92f0'}];
 THEMES[4].decor=THEMES[2].decor; // set after init (self-reference inside the literal is a TDZ error)
+// MONEY PIT (arena index 5): golden vault cave
+THEMES.push({name:'MONEY PIT',top:sprP(STONETOP,{G:'#fee761',g:'#d8a830',D:'#6a4a2a',d:'#4a321e',e:'#8a6238'}),fill:sprP(STONE,{D:'#6a4a2a',d:'#4a321e',e:'#8a6238'}),
+ brick:sprP(BR,{h:'#fff0a0',R:'#d8a830',r:'#8a6020'}),plank:sprP(PLR,{e:'#fee761',D:'#d8a830',d:'#8a6020'}),spike:sprP(SPK,{S:'#fff0a0',s:'#d8a830',k:'#3a2410'}),decor:THEMES[2].decor,
+ bg:()=>{bands([['#1a1008',0],['#2a1a0c',60],['#3a2410',120],['#4a3014',175],['#5a3a18',215]]);stars(70,7,'#fee761',H*.8);
+  peaks(.2,70,70,'#3a2810','#d8a830',6);peaks(.45,36,50,'#2a1a0a','#fee761',8)},thumb:'#d8a830'});
 // Store arena themes (cosmetic palette variants of existing arenas; same maps/physics)
 THEMES.push(
  {name:'NIGHT MEADOW',top:sprP(GR,{G:'#3a7a5a',g:'#2c5e48',d:'#4a3a5a',D:'#3a2c48',e:'#54446a'}),fill:sprP(GR.slice(6).concat(GR.slice(6,12)),{D:'#3a2c48',d:'#2c2238',e:'#54446a'}),

@@ -2,14 +2,14 @@
 'use strict';
 const crypto=require('crypto'),path=require('path'),express=require('express');
 module.exports=function mount(app,ctx){const {db,PDB,send}=ctx;const W=()=>ctx.wss;
- const ADM=ctx.ADM;ADM.maint=false;ADM.banner='';ADM.ov={};
+ const ADM=ctx.ADM;ADM.maint=false;ADM.banner='';ADM.ov={};ADM.pit={on:true,rate:40,cap:500};
  const KEY=process.env.ADMIN_KEY||'';
  const safeEq=(a,b)=>{a=Buffer.from(String(a));b=Buffer.from(String(b));return a.length==b.length&&crypto.timingSafeEqual(a,b)};
  const guard=(req,res,next)=>{if(!KEY||KEY.length<16)return res.status(503).json({error:'admin disabled (ADMIN_KEY not set)'});
   if(!safeEq(req.get('x-admin-key')||'',KEY))return res.status(401).json({error:'bad admin key'});next()};
  const H=fn=>(req,res,next)=>Promise.resolve(fn(req,res,next)).catch(e=>{console.error('admin',req.path,e);if(!res.headersSent)res.status(500).json({error:'server error'})});
  // load persisted overrides/flags (admin_kv: k TEXT PRIMARY KEY, v TEXT)
- ADM.load=async()=>{for(const r of await db.all('SELECT k,v FROM admin_kv',[])){try{const v=JSON.parse(r.v);if(r.k=='maint')ADM.maint=!!v;else if(r.k=='banner')ADM.banner=String(v||'');else if(r.k.startsWith('ov:'))ADM.ov[r.k.slice(3)]=v}catch(e){}}};
+ ADM.load=async()=>{for(const r of await db.all('SELECT k,v FROM admin_kv',[])){try{const v=JSON.parse(r.v);if(r.k=='maint')ADM.maint=!!v;else if(r.k=='banner')ADM.banner=String(v||'');else if(r.k=='pit')Object.assign(ADM.pit,v||{});else if(r.k.startsWith('ov:'))ADM.ov[r.k.slice(3)]=v}catch(e){}}};
  const kvSet=(k,v)=>db.run('INSERT INTO admin_kv(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v',[k,JSON.stringify(v)]);
  // public helpers used by the shop: key 'skin:N' or 'item:ID'
  ADM.price=(key,def)=>{const o=ADM.ov[key];return o&&Number.isInteger(o.p)?o.p:def};
@@ -26,6 +26,10 @@ module.exports=function mount(app,ctx){const {db,PDB,send}=ctx;const W=()=>ctx.w
   res.json({online:players.length,players,rooms:[...ctx.rooms.values()].map(r=>({code:r.code,state:r.state,quick:!!r.quick,tour:!!r.tour,humans:r.slots.filter(s=>s&&s.type=='human').length})),users:+u.n,maint:ADM.maint,banner:ADM.banner})}));
  A.post('/broadcast',H(async(req,res)=>{const m=String((req.body||{}).msg||'').slice(0,60).toUpperCase();ADM.banner=m;await kvSet('banner',m);if(m)broadcastAll({t:'notice',m});res.json({ok:true,banner:m})}));
  A.post('/maintenance',H(async(req,res)=>{ADM.maint=!!(req.body||{}).on;await kvSet('maint',ADM.maint);if(ADM.maint)broadcastAll({t:'notice',m:'MAINTENANCE: NO NEW MATCHES'});res.json({ok:true,maint:ADM.maint})}));
+ // MONEY PIT settings: on/off, frames between coin drops (10-300), jackpot cap (10-2000)
+ A.get('/pit',(req,res)=>res.json(ADM.pit));
+ A.post('/pit',H(async(req,res)=>{const b=req.body||{},P=ADM.pit;if(b.on!=null)P.on=!!b.on;if(b.rate!=null){const v=+b.rate|0;if(v<10||v>300)return res.status(400).json({error:'rate: 10-300 frames'});P.rate=v}
+  if(b.cap!=null){const v=+b.cap|0;if(v<10||v>2000)return res.status(400).json({error:'cap: 10-2000'});P.cap=v}await kvSet('pit',P);res.json(Object.assign({ok:true},P))}));
  A.post('/kick',H(async(req,res)=>{const id=+(req.body||{}).id;let n=0;if(!Number.isInteger(id))return res.status(400).json({error:'bad id'});
   for(const ws of W().clients)if(ws.user&&ws.user.id===id){send(ws,{t:'err',m:'KICKED BY ADMIN',fatal:true});ws.close();n++}res.json({ok:true,kicked:n})}));
  A.get('/items',(req,res)=>{const list=PDB.PRICES.map((p,i)=>({key:'skin:'+i,name:'SKIN '+i,base:p})).concat(PDB.COSMETICS.map(c=>({key:'item:'+c.id,name:c.cat+': '+(c.n||c.name||c.id),base:c.p})));
