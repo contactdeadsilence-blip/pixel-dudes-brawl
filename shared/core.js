@@ -1,6 +1,6 @@
 // Pixel Dudes Brawl - shared game simulation (runs in the browser AND on the Node server)
 (function(root){
-const PRICES=[0,0,0,0,200,200,200,250,250,250,300,300,300,350,350,350,400,400,450,450,500,350,350,400,400,450,450,500,500,550,550,600,600];
+const PRICES=[0,0,0,0,200,200,200,250,250,250,300,300,300,350,350,350,400,400,450,450,500,350,350,400,400,450,450,500,500,550,550,600,600,500];
 const STARTER=[0,1,2,3];
 const TIERS=[['BRONZE',0,'#c77b3f'],['SILVER',1100,'#c0c8d8'],['GOLD',1200,'#fee761'],['PLATINUM',1300,'#7fe0d0'],['DIAMOND',1400,'#8fb8ff']];
 const MODES=[{id:'stock',n:'STOCK',d:'LAST ONE STANDING'},{id:'time',n:'TIME',d:'MOST KOS WHEN TIME RUNS OUT'},{id:'koth',n:'KING OF THE HILL',d:'HOLD THE ZONE FOR 15 SECONDS'},{id:'teams',n:'TEAMS 2V2',d:'P1+P3 VS P2+P4'},{id:'coin',n:'COIN RUSH',d:'FIRST TO 15 COINS'},{id:'pit',n:'MONEY PIT',d:'GRAB RAINING COINS - LAST ONE STANDING WINS THE JACKPOT'}];

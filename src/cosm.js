@@ -1,4 +1,4 @@
-const SGC=11;
+const SGC=12;
 // ===== Store cosmetics (hats, trails, KO fx, poses, name colors, arena themes) =====
 let PVTH=null;const CB=PDBCore.COS_BY;
 function myEq(){return ACC.user&&ACC.user.cosm?ACC.user.cosm.eq:{}}
