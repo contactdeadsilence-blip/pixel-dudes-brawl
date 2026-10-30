@@ -128,6 +128,7 @@ function pvSkin(){const s=SH.sel[0];return owned(s)?s:(slots[0]&&owned(slots[0].
 function shopBuy(it){if(SH.busy)return;if(!ACC.user){toast('LOG IN TO SHOP');SFX.err();return}
  if(ownC(it.id)){SH.busy=true;api('shop/equip',{cat:it.cat,item:eqC(it)?null:it.id}).then(j=>{SH.busy=false;ACC.user=j.user;SFX.sel();toast(eqC(it)?it.n+' EQUIPPED':it.n+' REMOVED');if(NET.ws&&NET.ws.readyState==1)NET.ws.send(JSON.stringify({t:'cos'}))}).catch(e=>{SH.busy=false;toast(e.message);SFX.err()});return}
  if(it.off){toast('ITEM UNAVAILABLE');SFX.err();return}
+ if(it.sup){toast('BUY ANY COIN PACK TO UNLOCK');SFX.err();return}
  if(ACC.user.coins<it.p){toast('NOT ENOUGH COINS');SFX.err();return}
  SH.busy=true;api('shop/item',{item:it.id}).then(j=>{SH.busy=false;ACC.user=j.user;SFX.unlock();setTimeout(()=>SFX.coin(),350);toast(it.n+' UNLOCKED + EQUIPPED!');burst(W/2,120,'#fee761',30,3);if(NET.ws&&NET.ws.readyState==1)NET.ws.send(JSON.stringify({t:'cos'}))}).catch(e=>{SH.busy=false;toast(e.message);SFX.err()})}
 function updShop(){if(mBack()){state=SH.back=='online'?'online':'menu';SFX.back();return}
@@ -171,7 +172,7 @@ function drawShop(){const tb=SH.tab;text('STORE',W/2,22,PAL.Y,24,'center');acctB
  text(it.n,220,122,PAL.Y,16);text(TABS[tb].n,220,108,'#d8dde6',8);
  if(eqC(it))text('EQUIPPED  (A: REMOVE)',220,146,'#a1e55a',8);else if(ownC(it.id))text('OWNED  (A: EQUIP)',220,146,'#a1e55a',8);
  else if(it.off)text('UNAVAILABLE',220,146,'#e04848',16);
- else{coinIcon(220,137);text(String(it.p),232,146,'#fee761',16);text(!ACC.user?'LOG IN TO BUY':ACC.user.coins>=it.p?'PRESS A / ENTER TO BUY':'NOT ENOUGH COINS YET',220,162,'#d8dde6',8)}
+ else{coinIcon(220,137);text(it.sup?'SUPPORTER':String(it.p),232,146,'#fee761',16);text(!ACC.user?'LOG IN TO BUY':ACC.user.coins>=it.p?'PRESS A / ENTER TO BUY':'NOT ENOUGH COINS YET',220,162,'#d8dde6',8)}
  if(it.cat=='arena')text('RESKINS '+THEMES[it.base].name+' WHEN YOU PLAY IT (HOST ONLINE)',220,182,'#d8dde6',8);
  text('COSMETIC ONLY - NO GAMEPLAY EFFECT',220,206,'#8b93a8',8);
  bar([[['LB','RB'],'TAB'],[['DP'],'BROWSE'],[['A'],'BUY/EQUIP'],[['B'],'BACK']],[[['Q','E'],'TAB'],[['\u2190','\u2192'],'BROWSE'],[['ENTER'],'BUY/EQUIP'],[['ESC'],'BACK']],242)}

@@ -21,7 +21,7 @@ const COSMETICS=[
  {id:'ko_hearts',cat:'ko',n:'HEARTBREAK KO',p:300},{id:'ko_ghost',cat:'ko',n:'GHOST KO',p:350},{id:'ko_shatter',cat:'ko',n:'SHATTER KO',p:400},{id:'ko_firework',cat:'ko',n:'FIREWORKS KO',p:450},{id:'ko_skull',cat:'ko',n:'SKULL KO',p:500},{id:'ko_hole',cat:'ko',n:'BLACK HOLE KO',p:600},
  {id:'po_jump',cat:'pose',n:'VICTORY HOP',p:200},{id:'po_spin',cat:'pose',n:'SPIN',p:250},{id:'po_dance',cat:'pose',n:'DANCE',p:300},{id:'po_trophy',cat:'pose',n:'TROPHY RAISE',p:400},
  {id:'nc_gold',cat:'name',n:'GOLD NAME',p:100,c:'#fee761'},{id:'nc_mint',cat:'name',n:'MINT NAME',p:100,c:'#7fe0d0'},{id:'nc_pink',cat:'name',n:'PINK NAME',p:150,c:'#ff8ad0'},
- {id:'nc_sky',cat:'name',n:'SKY NAME',p:150,c:'#8fb8ff'},{id:'nc_fire',cat:'name',n:'FIRE NAME',p:200,c:'#f99252'},{id:'nc_rainbow',cat:'name',n:'RAINBOW NAME',p:300,c:'rainbow'},
+ {id:'nc_sky',cat:'name',n:'SKY NAME',p:150,c:'#8fb8ff'},{id:'nc_fire',cat:'name',n:'FIRE NAME',p:200,c:'#f99252'},{id:'nc_rainbow',cat:'name',n:'RAINBOW NAME',p:300,c:'rainbow'},{id:'nc_supporter',cat:'name',n:'SUPPORTER',p:0,c:'#ff8ad0',sup:1},
  {id:'ar_night',cat:'arena',n:'NIGHT MEADOW',p:400,base:0,th:6},{id:'ar_volcano',cat:'arena',n:'VOLCANO TOWERS',p:700,base:1,th:7},
  // melee weapons: purely visual (damage/hitboxes unchanged)
  {id:'wp_bat',cat:'weapon',n:'BASEBALL BAT',p:200},{id:'wp_wrench',cat:'weapon',n:'WRENCH',p:250},{id:'wp_sword',cat:'weapon',n:'SWORD',p:300},{id:'wp_spear',cat:'weapon',n:'SPEAR',p:350},
@@ -40,6 +40,8 @@ function bracketReport(b,r,m,w){const x=b.rd[r]&&b.rd[r][m];if(!x||x.w!=null||x.
  const nx=b.rd[r+1];if(nx){const y=nx[m>>1];if(m&1)y.b=w;else y.a=w}return true}
 function bracketChamp(b){const f=b.rd[b.rd.length-1][0];return f.w}
 function bracketRound(b,r){const n=b.rd.length-1-r;return n==0?'FINAL':n==1?'SEMIS':'QUARTERS'}
+// level curve: LV n needs 100+50*(n-1) more XP than LV n-1 (LV2=100, LV3=250, LV5=700, LV10=2700)
+function levelOf(xp){let L=1,need=100;xp=Math.max(0,xp|0);while(xp>=need&&L<99){xp-=need;L++;need=100+50*(L-1)}return {level:L,into:xp,need}}
 function tierOf(r){let t=TIERS[0];for(const x of TIERS)if(r>=x[1])t=x;return t[0]}
 function createCore(H){H=H||{};
 const W=480,T=16;const PCOL=['#e04848','#4a8fe0','#fee761','#a1e55a'];
@@ -190,6 +192,6 @@ function unsnap(a,f){f.x=a[0]/10;f.y=a[1]/10;f.vx=a[2]/10;f.vy=a[3]/10;f.face=a[
 return{ARENAS,T,PCOL,startFight,step,hitbox,onGround,snap,unsnap,snapX,unsnapX,rank,ITEM_KINDS,get items(){return IT},get hill(){return HILL},get coins(){return CO},get jackpot(){return opts.mode=='pit'?jackpot():0},get pitCap(){return pitCap()},get hillT(){return hillT},score,MODES,KOTH_GOAL,COIN_GOAL,get projs(){return PR},get mp(){return MP},get hz(){return HZ},
  get F(){return F},get map(){return map},get arena(){return arena},get WW(){return WW},get WH(){return WH},get readyT(){return readyT},get endT(){return endT},get winner(){return winner},get hitstop(){return hitstop},get timer(){return timer},get tick(){return tick},get opts(){return opts},
  setCPU(i,v){const f=F.find(f=>f.i==i);if(f)f.cpu=v}}}
-const api={createCore,PRICES,STARTER,TIERS,tierOf,CHALLENGES,chalAdd,ITEM_KINDS,ITEM_NAMES,MODES,COSMETICS,COS_CATS,COS_BY,cosParse,get ARENAS_N(){return this._an||(this._an=createCore({}).ARENAS.length)},bracketNew,bracketNext,bracketReport,bracketChamp,bracketRound};
+const api={createCore,PRICES,STARTER,TIERS,tierOf,levelOf,CHALLENGES,chalAdd,ITEM_KINDS,ITEM_NAMES,MODES,COSMETICS,COS_CATS,COS_BY,cosParse,get ARENAS_N(){return this._an||(this._an=createCore({}).ARENAS.length)},bracketNew,bracketNext,bracketReport,bracketChamp,bracketRound};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.PDBCore=api;
 })(typeof window!=='undefined'?window:globalThis);

@@ -4,7 +4,7 @@ const tierCol=n=>(TIERS.find(t=>t[0]==n)||TIERS[0])[2];
 function tierBadge(n,x,y,al='center'){if(!n)return;text(n,x,y,tierCol(n),8,al)}
 UIS.add('leader');ONL_ITEMS.splice(ONL_ITEMS.indexOf('SHOP'),0,'LEADERBOARD');
 const LBD={data:null,err:null,scroll:0};
-function goLeader(){LBD.data=null;LBD.err=null;LBD.scroll=0;state='leader';api('leaderboard').then(j=>LBD.data=j).catch(e=>LBD.err='COULD NOT LOAD')}
+function goLeader(){LBD.sel=0;LBD.data=null;LBD.err=null;LBD.scroll=0;state='leader';api('leaderboard').then(j=>LBD.data=j).catch(e=>LBD.err='COULD NOT LOAD')}
 const _updOnl=updOnlineMenu;updOnlineMenu=function(){if(ONL_ITEMS[onlSel]=='LEADERBOARD'&&mOK()){SFX.ok();goLeader();return}_updOnl()};
 function updLeader(){if(mBack()||mOK()){SFX.back();state='online';return}const n=LBD.data?LBD.data.top.length:0;
  if(mU()&&LBD.scroll>0){LBD.scroll--;SFX.sel()}if(mD()&&LBD.scroll<Math.max(0,n-9)){LBD.scroll++;SFX.sel()}}
@@ -13,7 +13,7 @@ function drawLeader(){text('LEADERBOARD',W/2,28,PAL.Y,32,'center');panel(60,36,3
   text('#',76,52,'#8b93a6',8,'center');text('PLAYER',90,52,'#8b93a6',8);text('TIER',290,52,'#8b93a6',8,'center');text('RATING',350,52,'#8b93a6',8,'center');text('WINS',396,52,'#8b93a6',8,'center');
   if(!D.top.length)text('NO RANKED MATCHES YET - PLAY QUICK MATCH!',W/2,120,'#d8dde6',8,'center');
   D.top.slice(LBD.scroll,LBD.scroll+9).forEach((r,k)=>{const y=58+k*16,me=ACC.user&&r.username==ACC.user.username;if(me){ctx.fillStyle='#5d4a6e';ctx.fillRect(66,y,348,15)}
-   text(String(r.pos),76,y+12,r.pos<=3?PAL.Y:'#ffffff',8,'center');text(r.username.slice(0,16),90,y+12,'#ffffff',16);tierBadge(r.tier,290,y+11);text(String(r.rating),350,y+12,'#ffffff',16,'center');text(String(r.wins),396,y+12,'#d8dde6',8,'center')});
+   text(String(r.pos),76,y+12,r.pos<=3?PAL.Y:'#ffffff',8,'center');if(k+LBD.scroll==LBD.sel){ctx.strokeStyle=PAL.Y;ctx.strokeRect(66.5,y+.5,347,14)}text(r.username.slice(0,16),90,y+12,'#ffffff',16);if(r.level)text('LV'+r.level,262,y+11,'#a1e55a',8,'center');tierBadge(r.tier,290,y+11);text(String(r.rating),350,y+12,'#ffffff',16,'center');text(String(r.wins),396,y+12,'#d8dde6',8,'center')});
   if(D.top.length>9)text((LBD.scroll+1)+'-'+Math.min(D.top.length,LBD.scroll+9)+' OF '+D.top.length,404,218,'#8b93a6',8,'right');
   const m=D.me;text(m?('YOU: '+(m.pos?'#'+m.pos+'  ':'UNRANKED  ')+m.tier+'  '+m.rating):(ACC.user&&ACC.user.guest?'GUEST ACCOUNTS ARE NOT RANKED':''),W/2,212,m?tierCol(m.tier):'#8b93a6',8,'center')}
  text('QUICK MATCHES ARE RANKED',W/2,236,'#8b93a6',8,'center');bar([[['DP'],'SCROLL'],[['B'],'BACK']],[[['\u2191','\u2193'],'SCROLL'],[['ESC'],'BACK']])}

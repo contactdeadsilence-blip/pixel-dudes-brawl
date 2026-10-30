@@ -184,7 +184,7 @@ function drawLobby(){const L=NET.lobby;if(!L){text(NET.ws&&NET.ws.readyState==1?
  text(L.quick?'QUICK MATCH':'PRIVATE ROOM',W/2,26,PAL.Y,32,'center');if(!L.quick){panel(W/2-60,31,120,19);text('CODE: '+L.code,W/2,46,'#ffffff',16,'center')}acctBadge(W-4,4,'right');
  for(let i=0;i<4;i++){const s=L.slots[i],x=8+i*118,y=62;panel(x,y,110,116,i==L.you?'#5d4a6e':'#2b2b40');ctx.fillStyle=PCOL[i];ctx.fillRect(x+1,y+1,108,3);
   if(!s){text(L.quick?'SEARCHING':'EMPTY',x+55,y+60,'#8b93a6',16,'center');continue}
-  text(s.name.slice(0,12),x+55,y+20,nameCol(s.cos,PCOL[i]),s.name.length>6?8:16,'center');drawSheet(imgs[s.skin],x+39,y+28,1,2,Math.floor(t/7)%4,2);text(NAMES[s.skin],x+55,y+82,PAL.Y,16,'center');
+  text(s.name.slice(0,12),x+55,y+20,nameCol(s.cos,PCOL[i]),s.name.length>6?8:16,'center');if(s.lv)text('LV'+s.lv,x+4,y+13,'#a1e55a',8);drawSheet(imgs[s.skin],x+39,y+28,1,2,Math.floor(t/7)%4,2);text(NAMES[s.skin],x+55,y+82,PAL.Y,16,'center');
   text(s.type=='cpu'?'CPU':i==L.you?'YOU':s.host?'HOST':'PLAYER',x+55,y+102,'#d8dde6',8,'center')}
  const A=ARENAS[L.arena];text(L.quick?'ARENA: RANDOM':'ARENA: \u2190 '+A.name+' \u2192',W/2,192,'#ffffff',16,'center');text(rulesLine(L.quick?'stock':L.mode,L.quick?2:L.items,L.ff),W/2,203,'#ffffff',8,'center');
  let st=L.count>=0?'STARTING IN '+L.count:L.quick?(L.fill>=0?'WAITING FOR PLAYERS... CPU FILL IN '+L.fill:'WAITING FOR PLAYERS...'):L.host?'START WHEN READY (2+ FIGHTERS)':'WAITING FOR HOST TO START';text(st,W/2,st.length>30?215:218,L.count>=0?PAL.Y:'#d8dde6',st.length>30?8:16,'center');
@@ -216,7 +216,7 @@ const LC={ticket:null,res:null,busy:false,me:-1};
 const _sfRaw=startFight;startFight=function(){_sfRaw();LKOS.fill(0);LC.res=null;LC.ticket=null;LC.me=slots.findIndex(s=>s.type=='human');
  if(ONLINE&&ACC.user&&LC.me>=0)api('local/start',{}).then(j=>LC.ticket=j.ticket).catch(()=>{})};
 function localClaim(){const tk=LC.ticket;LC.ticket=null;if(!tk||!ACC.user)return;LC.busy=true;
- api('local/end',{ticket:tk,players:slots.filter(s=>s.type!='none').length,kos:LKOS[LC.me]||0,won:!!(winner&&winner.i==LC.me),flawless:!!(winner&&winner.i==LC.me&&F[LC.me]&&F[LC.me].stocks>=SET.stocks),mode:typeof MODE!='undefined'?MODE.id:'stock'}).then(j=>{LC.busy=false;LC.res=j;ACC.user=j.user;chalToast(j.chal);if(j.coins)setTimeout(()=>SFX.coin(),400)}).catch(()=>{LC.busy=false})}
+ api('local/end',{ticket:tk,skin:slots[LC.me]?slots[LC.me].skin:null,players:slots.filter(s=>s.type!='none').length,kos:LKOS[LC.me]||0,won:!!(winner&&winner.i==LC.me),flawless:!!(winner&&winner.i==LC.me&&F[LC.me]&&F[LC.me].stocks>=SET.stocks),mode:typeof MODE!='undefined'?MODE.id:'stock'}).then(j=>{LC.busy=false;LC.res=j;ACC.user=j.user;chalToast(j.chal);if(j.coins)setTimeout(()=>SFX.coin(),400)}).catch(()=>{LC.busy=false})}
 let _prevState=null;const _updC=update;update=function(){_updC();if(state=='win'&&_prevState!='win')localClaim();_prevState=state};
 const _drawC=draw;draw=function(){_drawC();if(!ONLINE)return;ctx.save();ctx.setTransform(cv.width/W,0,0,cv.height/H,0,0);
  if(state=='menu'&&ACC.user)safe(()=>acctBadge(W-4,4,'right'));if(state=='menu')drawStudio();

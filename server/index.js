@@ -16,7 +16,7 @@ const q={byName:n=>db.get('SELECT * FROM users WHERE lower(username)=lower(?)',[
  tok:t=>db.get('SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=?',[t]),
  delTok:t=>db.run('DELETE FROM sessions WHERE token=?',[t]),setS:(j,id)=>db.run('UPDATE users SET settings=? WHERE id=?',[j,id]),
  coins:(a,id)=>db.run('UPDATE users SET coins=coins+? WHERE id=?',[a,id])};
-const pub=u=>({username:u.username,coins:u.coins,rating:u.rating,games:u.games,wins:u.wins,tier:PDB.tierOf(u.rating),unlocked:JSON.parse(u.unlocked||'[]'),settings:JSON.parse(u.settings||'{}'),guest:!!u.guest,cosm:PDB.cosParse(u.cosm),trophies:u.trophies|0});
+const pub=u=>({username:u.username,coins:u.coins,rating:u.rating,games:u.games,wins:u.wins,tier:PDB.tierOf(u.rating),unlocked:JSON.parse(u.unlocked||'[]'),settings:JSON.parse(u.settings||'{}'),guest:!!u.guest,cosm:PDB.cosParse(u.cosm),trophies:u.trophies|0,xp:u.xp|0,level:PDB.levelOf(u.xp|0).level,bio:u.bio||''});
 const eqOf=u=>u?PDB.cosParse(u.cosm).eq:{};
 const newSession=async u=>{const t=crypto.randomBytes(24).toString('hex');await db.run('INSERT INTO sessions(token,user_id,created) VALUES(?,?,?)',[t,u.id,Date.now()]);return t};
 // sliding 90-day sessions: each use extends the expiry; expired tokens are deleted and rejected
@@ -24,7 +24,7 @@ async function userOf(t){if(!t)return null;t=String(t);const r=await db.get('SEL
  if(r.created<Date.now()-SESS_MS){await q.delTok(t);return null}if(Date.now()-r.created>36e5)await db.run('UPDATE sessions SET created=? WHERE token=?',[Date.now(),t]);return (await q.tok(t))||null}
 const H=fn=>(req,res,next)=>Promise.resolve(fn(req,res,next)).catch(e=>{console.error('api',req.path,e);if(!res.headersSent)res.status(500).json({error:'server error'})});
 
-const app=express();app.use(express.json({limit:'32kb'}));app.use((req,res,next)=>{ready.then(()=>next(),next)});
+const FEAT=require('./feat.js');const app=express();FEAT.early(app,{db,PDB,ready});app.use(express.json({limit:'32kb'}));app.use((req,res,next)=>{ready.then(()=>next(),next)});
 const auth=H(async(req,res,next)=>{const t=(req.get('authorization')||'').replace(/^Bearer /,'');const u=await userOf(t);if(!u)return res.status(401).json({error:'not logged in'});req.user=u;req.token=t;next()});
 app.post('/api/register',H(async(req,res)=>{const {username,password}=req.body||{};
  if(typeof username!='string'||!/^[A-Za-z0-9_]{3,12}$/.test(username))return res.status(400).json({error:'username: 3-12 letters, digits or _'});
@@ -46,7 +46,8 @@ app.post('/api/guest',H(async(req,res)=>{let u;for(let k=0;k<20&&!u;k++){const n
  if(!u)return res.status(503).json({error:'try again'});res.json({token:await newSession(u),user:pub(u)})}));
 // ===== Earning =====
 const dayKey=()=>new Date(Date.now()-8*36e5).toISOString().slice(0,10); // Pacific-ish day
-async function grant(uid,kind,amt){if(amt>0){await q.coins(amt,uid);await db.run('INSERT INTO earn(user_id,day,kind,amt) VALUES(?,?,?,?)',[uid,dayKey(),kind,amt])}return amt}
+const XPK={online:1,local:1,pit:1,tour:1};
+async function grant(uid,kind,amt){if(amt>0){await q.coins(amt,uid);if(XPK[kind])await db.run('UPDATE users SET xp=COALESCE(xp,0)+? WHERE id=?',[amt,uid]);await db.run('INSERT INTO earn(user_id,day,kind,amt) VALUES(?,?,?,?)',[uid,dayKey(),kind,amt])}return amt}
 // once-per-day bonus: the primary key on once_day makes the claim atomic (no double grant on concurrent requests)
 async function onceToday(uid,kind,amt){const r=await db.run('INSERT INTO once_day(user_id,day,kind) VALUES(?,?,?) ON CONFLICT DO NOTHING',[uid,dayKey(),kind]);return r.changes==1?grant(uid,kind,amt):0}
 function dailyLogin(u){if(u.guest)return 0;return onceToday(u.id,'login',REWARD.daily)}
@@ -76,6 +77,7 @@ app.post('/api/local/end',auth,H(async(req,res)=>{const b=req.body||{},tk=LOCAL.
  const kos=Math.max(0,Math.min(LOCAL.maxKo,3*(players-1),b.kos|0,Math.floor(secs/5))),won=!!b.won;
  const bd={part:LOCAL.part,ko:LOCAL.ko*kos,win:won?LOCAL.win:0};let tot=Math.min(LOCAL.maxMatch,bd.part+bd.ko+bd.win);
  const left=Math.max(0,LOCAL.dayCap-(await db.get('SELECT COALESCE(SUM(amt),0) s FROM earn WHERE user_id=? AND day=? AND kind=?',[req.user.id,dayKey(),'local'])).s);let capped=tot>left;tot=Math.min(tot,left);await grant(req.user.id,'local',tot);
+ await FEAT.recordMatch(db,req.user.id,Number.isInteger(b.skin)?b.skin:null,kos);
  bd.firstWin=won&&tot>0?await onceToday(req.user.id,'firstwin',REWARD.firstWin):0;
  const chal=await chalProgress(req.user.id,{won,kos,online:false,flawless:won&&!!b.flawless,players,mode:String(b.mode||'stock')});
  res.json({chal,coins:tot+bd.firstWin,breakdown:bd,capped,user:pub(await q.byId(req.user.id))})}));
@@ -92,7 +94,7 @@ app.post('/api/shop/buy',auth,H(async(req,res)=>{const skin=req.body&&req.body.s
  if(r.changes!=1)return res.status(409).json({error:'try again'});await db.run('INSERT INTO purchases(user_id,skin,price,ts) VALUES(?,?,?,?)',[u.id,skin,price,Date.now()]);
  res.json({user:pub(await q.byId(req.user.id))})}));
 // cosmetics: same optimistic compare-and-set guard as skins (coins and the cosm JSON must be unchanged since read)
-app.post('/api/shop/item',auth,H(async(req,res)=>{const id=req.body&&req.body.item,it=typeof id=='string'&&PDB.COS_BY[id];if(!it)return res.status(400).json({error:'unknown item'});if(ADM.off('item:'+id))return res.status(403).json({error:'item disabled'});const ip=ADM.price('item:'+id,it.p);
+app.post('/api/shop/item',auth,H(async(req,res)=>{const id=req.body&&req.body.item,it=typeof id=='string'&&PDB.COS_BY[id];if(!it)return res.status(400).json({error:'unknown item'});if(it.sup)return res.status(403).json({error:'buy any coin pack to unlock'});if(ADM.off('item:'+id))return res.status(403).json({error:'item disabled'});const ip=ADM.price('item:'+id,it.p);
  const u=await q.byId(req.user.id),c=PDB.cosParse(u.cosm);if(c.own.includes(id))return res.status(409).json({error:'already owned'});if(u.coins<ip)return res.status(402).json({error:'not enough coins'});
  c.own.push(id);c.eq[it.cat]=id;const r=await db.run('UPDATE users SET coins=coins-?,cosm=? WHERE id=? AND coins>=? AND cosm '+(db.kind=='pg'?'IS NOT DISTINCT FROM':'IS')+' ?',[ip,JSON.stringify(c),u.id,ip,u.cosm]);
  if(r.changes!=1)return res.status(409).json({error:'try again'});await db.run('INSERT INTO purchases(user_id,skin,price,ts,item) VALUES(?,?,?,?,?)',[u.id,-1,ip,Date.now(),id]);
@@ -101,12 +103,12 @@ app.post('/api/shop/equip',auth,H(async(req,res)=>{const b=req.body||{},cat=b.ca
  const u=await q.byId(req.user.id),c=PDB.cosParse(u.cosm);if(id==null)delete c.eq[cat];else{const it=PDB.COS_BY[id];if(!it||it.cat!=cat)return res.status(400).json({error:'unknown item'});if(!c.own.includes(id))return res.status(403).json({error:'not owned'});c.eq[cat]=id}
  await db.run('UPDATE users SET cosm=? WHERE id=?',[JSON.stringify(c),u.id]);res.json({user:pub(await q.byId(req.user.id))})}));
 // Real-money coin packs are intentionally NOT implemented. Wire a payment provider here (e.g. Stripe Checkout + webhook that credits coins).
-app.post('/api/coins/checkout',auth,(req,res)=>res.status(501).json({error:'payments not configured'}));
+FEAT.routes(app,{db,q,PDB,auth,H,pub});
 // ===== Ranked =====
 app.get('/api/leaderboard',H(async(req,res)=>{const t=(req.get('authorization')||'').replace(/^Bearer /,''),u=await userOf(t);
- const top=await db.all('SELECT username,rating,games,wins FROM users WHERE guest=0 AND games>0 ORDER BY rating DESC,wins DESC LIMIT 50');
+ const top=await db.all('SELECT username,rating,games,wins,xp FROM users WHERE guest=0 AND games>0 ORDER BY rating DESC,wins DESC LIMIT 50');
  const pos=u&&!u.guest&&u.games?(await db.get('SELECT COUNT(*)+1 n FROM users WHERE guest=0 AND games>0 AND rating>?',[u.rating])).n:null;
- res.json({top:top.map((r,k)=>Object.assign(r,{pos:k+1,tier:PDB.tierOf(r.rating)})),me:u&&!u.guest?{username:u.username,rating:u.rating,games:u.games,tier:PDB.tierOf(u.rating),pos}:null})}));
+ res.json({top:top.map((r,k)=>Object.assign(r,{pos:k+1,level:PDB.levelOf(r.xp|0).level,tier:PDB.tierOf(r.rating)})),me:u&&!u.guest?{username:u.username,rating:u.rating,games:u.games,tier:PDB.tierOf(u.rating),pos}:null})}));
 // Elo across placements: every pair of ranked (non-guest) humans is a game; K scaled by field size.
 // CPU opponents also count (so solo-vs-bots online play ranks you), but against a fixed bot rating, half K, and EASY gains are damped + capped to stop farming.
 const BOT_R=[800,1000,1200],BOT_K=16,EASY_GAIN_MULT=.5,EASY_GAIN_CAP=5;
@@ -159,7 +161,7 @@ const teamOf=r=>r.slots.map((s,i)=>s&&s.team!=null?s.team:i%2);
 function pickTeam(r){const c=[0,0];r.slots.forEach(s=>{if(s&&s.team!=null)c[s.team]++});return c[0]<=c[1]?0:1}
 function lobbyMsg(r,ws){const you=r.slots.findIndex(s=>s&&s.ws===ws),now=Date.now();
  return {t:'lobby',code:r.code,quick:r.quick,q2:r.q2,tour:r.tour,tsize:r.tsize,T:r.T,ent:r.ent?r.ent.map(s=>({name:s.name,skin:s.skin,type:s.type})):null,tstate:r.state,host:r.host===ws,you,arena:r.arena,mode:r.mode||'stock',items:r.items|0,ff:!!r.ff,
-  slots:r.slots.map(s=>{if(!s)return null;const rt=s.uid&&s.ws&&s.ws.user&&!s.ws.user.guest?s.ws.user.rating:null;return {type:s.type,name:s.name,skin:s.skin,cos:s.cos||{},team:s.team,host:s.ws&&s.ws===r.host,tier:rt!=null?PDB.tierOf(rt):null,rating:rt}}),ranked:r.quick,
+  slots:r.slots.map(s=>{if(!s)return null;const rt=s.uid&&s.ws&&s.ws.user&&!s.ws.user.guest?s.ws.user.rating:null;return {type:s.type,name:s.name,skin:s.skin,cos:s.cos||{},team:s.team,host:s.ws&&s.ws===r.host,tier:rt!=null?PDB.tierOf(rt):null,rating:rt,lv:s.uid&&s.ws&&s.ws.user&&!s.ws.user.guest?PDB.levelOf(s.ws.user.xp|0).level:null}}),ranked:r.quick,
   count:r.countAt?Math.max(0,Math.ceil((r.countAt-now)/1000)):-1,fill:r.quick&&r.fillAt&&!r.countAt?Math.max(0,Math.ceil((r.fillAt-now)/1000)):-1}}
 const pushLobby=r=>{for(const s of viewers(r))send(s.ws,lobbyMsg(r,s.ws))};
 function firstOwned(u,pref){const un=JSON.parse(u.unlocked);return un.includes(pref)?pref:un[0]}
@@ -199,7 +201,7 @@ function endMatch(r){clearTimeout(r.loop);r.loop=null;r.ending=true;finishMatch(
 // rewards/ratings are written to the DB (async); slots that disconnect meanwhile become CPUs as usual since state is still 'fight'
 async function finishMatch(r){const c=r.core,w=c.winner;
  const all=c.rank(),rank=[];
- for(const f of all){const s=r.slots[f.i];let coins=0,bd=null;if(s&&s.type=='human'&&s.uid){const place=all.indexOf(f),won=w&&w.i==f.i;bd={part:REWARD.part,ko:REWARD.ko*Math.min(s.kos,9),place:w?REWARD.place[place]||0:0};coins=await grant(s.uid,'online',bd.part+bd.ko+bd.place);if(won)coins+=(bd.firstWin=await onceToday(s.uid,'firstwin',REWARD.firstWin))}
+ for(const f of all){const s=r.slots[f.i];let coins=0,bd=null;if(s&&s.type=='human'&&s.uid){const place=all.indexOf(f),won=w&&w.i==f.i;bd={part:REWARD.part,ko:REWARD.ko*Math.min(s.kos,9),place:w?REWARD.place[place]||0:0};coins=await grant(s.uid,'online',bd.part+bd.ko+bd.place);await FEAT.recordMatch(db,s.uid,f.skin,Math.min(s.kos,9));if(won)coins+=(bd.firstWin=await onceToday(s.uid,'firstwin',REWARD.firstWin))}
   if(s&&s.type=='human'&&s.uid&&s.ws){s.chal=await chalProgress(s.uid,{won:!!(w&&w.i==f.i),kos:s.kos,online:true,flawless:!!(w&&w.i==f.i)&&f.stocks>=ONLINE_RULES.stocks,players:all.length,mode:r.mode||'stock'})}if(r.mode=='pit'&&!r.tour&&w&&w.i==f.i&&s&&s.type=='human'&&s.uid&&bd){const J=c.jackpot|0,hum=r.slots.filter(x=>x&&x.type=='human'&&x.uid).length;
    // anti-farm: jackpot only pays in full when another human was in the match; vs bots/solo it pays 25%
    const pay=hum>=2?J:Math.floor(J/4);if(pay>0){bd.jackpot=await grant(s.uid,'pit',pay);coins+=bd.jackpot}}
