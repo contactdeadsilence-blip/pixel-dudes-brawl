@@ -20,11 +20,11 @@ function drawLeader(){text('LEADERBOARD',W/2,28,PAL.Y,32,'center');panel(60,36,3
 const _drawUIx=drawUI;drawUI=function(){if(state=='leader')drawLeader();else _drawUIx()};
 const _updUIx=updUI;updUI=function(){if(state=='leader')updLeader();else _updUIx()};
 const _drawLobbyx=drawLobby;drawLobby=function(){_drawLobbyx();const L=NET.lobby;if(!L)return;
- for(let i=0;i<4;i++){const s=L.slots[i];if(s&&s.tier)tierBadge(s.tier+' '+s.rating,8+i*118+55,60+99)}
- if(L.ranked)text('RANKED',W/2,56,'#8fb8ff',8,'center')};
+ for(let i=0;i<4;i++){const s=L.slots[i];if(s&&s.tier)tierBadge(s.tier+' '+s.rating,8+i*118+55,62+92)}
+ if(L.ranked&&!L.q2)text('RANKED',W/2,58,'#8fb8ff',8,'center')};
 const _drawResx=drawResults;drawResults=function(){_drawResx();const R=NET.res;if(!R)return;const me=R.rank.find(r=>r.i==NET.you);
  if(me&&me.rank){const k=me.rank;if(ACC.user){ACC.user.rating=k.rating;ACC.user.tier=k.tier}text('RATING '+k.old+' \u2192 '+k.rating+' ('+(k.delta>=0?'+':'')+k.delta+')  '+k.tier,W/2,178,k.delta>=0?'#7fe07f':'#ff7f7f',8,'center')}
- R.rank.forEach((r,k)=>{if(r.rank){const y=70+k*30;text((r.rank.delta>=0?'+':'')+r.rank.delta,120+r.name.length*8+6,y+17,r.rank.delta>=0?'#7fe07f':'#ff7f7f',8)}})};
+ const RH=resRH(R);R.rank.forEach((r,k)=>{if(r.rank){const y=70+k*RH;text((r.rank.delta>=0?'+':'')+r.rank.delta,120+Math.min(14,r.name.length)*8+6,y+(RH<30?15:17),r.rank.delta>=0?'#7fe07f':'#ff7f7f',8)}})};
 // ===== Daily challenges =====
 UIS.add('chal');ONL_ITEMS.splice(ONL_ITEMS.indexOf('SHOP'),0,'CHALLENGES');
 const CHS={data:null,err:null,back:'menu',at:0};

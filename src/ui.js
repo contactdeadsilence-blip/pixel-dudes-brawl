@@ -15,7 +15,7 @@ if(ONLINE&&ACC.token){ACC.checking=true;api('me').then(j=>{j.fresh=true;setUser(
 // ===== Small UI helpers =====
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function listNav(n,sel){if(mU()){SFX.sel();return (sel+n-1)%n}if(mD()){SFX.sel();return (sel+1)%n}return sel}
-function drawList(items,sel,cx,y,w,rh=18){items.forEach((o,k)=>{const yy=y+k*rh,x=cx-w/2;if(k==sel){ctx.fillStyle='#5d4a6e';ctx.fillRect(x,yy-13,w,18);ctx.fillStyle=PAL.Y;ctx.fillRect(x,yy-13,2,18);ctx.fillRect(x+w-2,yy-13,2,18);text('\u2192 '+o+' \u2190',cx,yy,PAL.Y,16,'center')}else text(o,cx,yy,'#ffffff',16,'center')})}
+function drawList(items,sel,cx,y,w,rh=18){items.forEach((o,k)=>{const yy=y+k*rh,x=cx-w/2;if(k==sel){const hh=Math.min(18,rh+1),ht=yy-13+Math.floor((18-hh)/2);ctx.fillStyle='#5d4a6e';ctx.fillRect(x,ht,w,hh);ctx.fillStyle=PAL.Y;ctx.fillRect(x,ht,2,hh);ctx.fillRect(x+w-2,ht,2,hh);text('\u2192 '+o+' \u2190',cx,yy,PAL.Y,16,'center')}else text(o,cx,yy,'#ffffff',16,'center')})}
 function bar(pi,ki,y=252){const items=lastDev=='pad'?pi.map(([g,l])=>[g.map(PB),l]):ki.map(([g,l])=>[g.map(KC),l]);const w=promptW(items)+16;panel(Math.round(W/2-w/2),y-4,w,19);prompt(items,W/2,y)}
 function coinIcon(x,y){ctx.fillStyle=PAL.o;ctx.fillRect(x+1,y,5,7);ctx.fillRect(x,y+1,7,5);ctx.fillStyle='#fee761';ctx.fillRect(x+1,y+1,5,5);ctx.fillStyle='#f99252';ctx.fillRect(x+3,y+2,1,3)}
 function lockIcon(x,y,price){ctx.fillStyle='rgba(20,16,28,.6)';ctx.fillRect(x+1,y+1,26,29);const lx=x+10,ly=y+7;ctx.fillStyle=PAL.o;ctx.fillRect(lx,ly,9,12);ctx.fillStyle='#d8dde6';ctx.fillRect(lx+2,ly+1,1,4);ctx.fillRect(lx+6,ly+1,1,4);ctx.fillRect(lx+2,ly+1,5,1);ctx.fillStyle='#fee761';ctx.fillRect(lx+1,ly+5,7,6);ctx.fillStyle=PAL.o;ctx.fillRect(lx+4,ly+7,1,2);
@@ -74,7 +74,7 @@ function drawSettings(){text('SETTINGS',W/2,26,PAL.Y,32,'center');panel(30,34,42
   if(ST.wait){ctx.fillStyle='rgba(0,0,0,.7)';ctx.fillRect(-4e3,-4e3,9e3,9e3);panel(90,100,300,60);text('PRESS A KEY FOR',W/2,124,'#ffffff',16,'center');text(ST.wait,W/2,144,PAL.Y,16,'center');text('ESC TO CANCEL',W/2,156,'#8b93a6',8,'center')}
   bar([[['DP'],'SELECT'],[['A'],'REBIND'],[['B'],'BACK']],[[['\u2191','\u2193'],'SELECT'],[['ENTER'],'REBIND'],[['ESC'],'BACK']]);return}
  const it=setItems();for(let k=ST.top;k<Math.min(it.length,ST.top+10);k++){const o=it[k],y=54+(k-ST.top)*17;if(k==ST.sel){ctx.fillStyle='#5d4a6e';ctx.fillRect(36,y-13,408,17);ctx.fillStyle=PAL.Y;ctx.fillRect(36,y-13,2,17)}
-  text(o.l,46,y,k==ST.sel?PAL.Y:'#ffffff',16);if(o.v){const v=o.v();text(o.ch&&k==ST.sel&&!o.ok?'\u2190 '+v+' \u2192':v,436,y,'#a1e55a',v.length>12?8:16,'right')}}
+  text(o.l,46,y,k==ST.sel?PAL.Y:'#ffffff',16);if(o.v){const v=o.v();text(o.ch&&k==ST.sel&&!o.ok?'\u2190 '+v+' \u2192':v,436,y,'#a1e55a',v.length>16?8:16,'right')}}
  if(ST.top>0)text('\u2191',W/2,40,'#8b93a6',8,'center');if(ST.top+10<it.length)text('\u2193',W/2,222,'#8b93a6',8,'center');
  if(ST.sel>=10&&ST.sel<=13)text('CPU / STOCKS / TIMER / ITEMS APPLY TO LOCAL MATCHES',W/2,232,'#d8dde6',8,'center');
  bar([[['DP'],'CHANGE'],[['A'],'OK'],[['B'],'BACK']],[[['\u2191','\u2193','\u2190','\u2192'],'CHANGE'],[['ENTER'],'OK'],[['ESC'],'BACK']])}
@@ -107,9 +107,9 @@ let onlSel=0;const ONL_ITEMS=['QUICK MATCH','CREATE PRIVATE ROOM','JOIN WITH COD
 function updOnlineMenu(){onlSel=listNav(ONL_ITEMS.length,onlSel);if(mBack()){state='menu';SFX.back();return}
  if(mOK()){const o=ONL_ITEMS[onlSel];SFX.ok();if(o=='QUICK MATCH'){NET.lobby=null;state='lobby';netOpen({t:'quick'})}else if(o=='CREATE PRIVATE ROOM'){NET.lobby=null;state='lobby';netOpen({t:'create'})}
   else if(o=='JOIN WITH CODE'){JC.code=['A','A','A','A'];JC.pos=0;state='joincode'}else if(o=='SHOP')goShop('online');else if(o=='LOG OUT'){logout();state='menu';toast('LOGGED OUT')}else state='menu'}}
-function drawOnlineMenu(){text('ONLINE',W/2,30,PAL.Y,32,'center');acctBadge(W/2,38,'center'==0?'left':'left');panel(W/2-110,54,220,ONL_ITEMS.length*18+10);drawList(ONL_ITEMS,onlSel,W/2,72,206,18);
- if(ACC.user&&ACC.user.guest)text('GUEST ACCOUNT - PROGRESS SAVED ON THIS DEVICE ONLY',W/2,230,'#8b93a6',8,'center');
- text('EARN COINS: PLAY 20  KO 15  WIN 50',W/2,220,'#fee761',8,'center');bar([[['DP'],'SELECT'],[['A'],'OK'],[['B'],'BACK']],[[['\u2191','\u2193'],'SELECT'],[['ENTER'],'OK'],[['ESC'],'BACK']])}
+function drawOnlineMenu(){text('ONLINE',W/2,30,PAL.Y,32,'center');acctBadge(W-4,4,'right');const orh=Math.max(12,Math.min(18,Math.floor(150/ONL_ITEMS.length)));panel(W/2-110,40,220,ONL_ITEMS.length*orh+8);drawList(ONL_ITEMS,onlSel,W/2,40+4+orh-4,206,orh);
+ if(ACC.user&&ACC.user.guest)text('GUEST ACCOUNT - PROGRESS SAVED ON THIS DEVICE ONLY',W/2,234,'#8b93a6',8,'center');
+ text('EARN COINS: PLAY 20  KO 15  WIN 50',W/2,224,'#fee761',8,'center');bar([[['DP'],'SELECT'],[['A'],'OK'],[['B'],'BACK']],[[['\u2191','\u2193'],'SELECT'],[['ENTER'],'OK'],[['ESC'],'BACK']])}
 function updJoin(){const A='ABCDEFGHIJKLMNOPQRSTUVWXYZ';if(mL()&&!KP.KeyA){JC.pos=(JC.pos+3)%4;SFX.sel()}if(mR()&&!KP.KeyD){JC.pos=(JC.pos+1)%4;SFX.sel()}
  const cyc=d=>{JC.code[JC.pos]=A[(A.indexOf(JC.code[JC.pos])+d+26)%26];SFX.sel()};if(KP.ArrowUp||anyPad(i=>padRep(i,'up')))cyc(-1);if(KP.ArrowDown||anyPad(i=>padRep(i,'dn')))cyc(1);
  if(KP.Escape||anyPad(i=>padEdge(i,'B'))){state='online';SFX.back();return}
@@ -158,10 +158,11 @@ function interp(){const S=NET.snaps;if(!S.length)return;const now=performance.no
   f.anim+=Math.abs(f.vx)*.1;if(f.dashT>0){f.trail.unshift([f.x,f.y]);if(f.trail.length>4)f.trail.pop()}else if(f.trail.length)f.trail.pop()});
  CORE.unsnapX(L.X);readyT=L.readyT;endT=L.endT;NET.timer=L.timer;camUpdate(false)}
 function updResult(){if(mOK()||mStart()){SFX.ok();state=NET.lobby?'lobby':'online'}else if(mBack()){SFX.back();netLeave()}}
+function resRH(R){return R&&R.rank.length>2?26:30}
 function drawResults(){const R=NET.res;if(!R)return;ctx.fillStyle='rgba(59,44,46,.8)';ctx.fillRect(-4e3,-4e3,9e3,9e3);panel(60,20,360,212);
  const w=R.winner!=null?R.rank.find(r=>r.i==R.winner):null;const tm=CORE.opts&&CORE.opts.teams;text(w?(tm?'TEAM '+TEAMN[teamOfSlot(w.i)]+' WINS!':w.name+' WINS!'):'DRAW!',W/2,50,w?(tm?TEAMC[teamOfSlot(w.i)]:PCOL[w.i]):'#ffffff',32,'center');
- R.rank.forEach((r,k)=>{const y=70+k*30;panel(76,y,328,26,r.i==NET.you?'#5d4a6e':'#3b3f52');text(String(k+1),88,y+19,PAL.Y,16,'center');drawSheet(imgs[r.skin],98,y+1,1,0,0);text(r.name,120,y+18,PCOL[r.i],16);
-  text(r.kos+' KO',300,y+18,'#ffffff',16,'right');if(r.coins){coinIcon(318,y+9);text('+'+r.coins,330,y+17,'#fee761',16)}});
+ const RH=resRH(R);R.rank.forEach((r,k)=>{const y=70+k*RH;panel(76,y,328,RH-4,r.i==NET.you?'#5d4a6e':'#3b3f52');const ty=RH<30?y+16:y+18;text(String(k+1),88,ty+1,PAL.Y,16,'center');drawSheet(imgs[r.skin],98,y+(RH<30?-1:1),1,0,0);text(r.name.slice(0,14),120,ty,PCOL[r.i],16);
+  text(r.kos+' KO',300,ty,'#ffffff',16,'right');if(r.coins){coinIcon(318,ty-9);text('+'+r.coins,330,ty-1,'#fee761',16)}});
  const me=R.rank.find(r=>r.i==NET.you);if(me&&me.bd)text(bdText(me.bd),W/2,186,'#d8dde6',8,'center');
  if(ACC.user){coinIcon(W/2-40,196);text('TOTAL '+ACC.user.coins,W/2-30,203,'#fee761',8)}
  bar([[['A'],'CONTINUE'],[['B'],'LEAVE']],[[['ENTER'],'CONTINUE'],[['ESC'],'LEAVE']],212)}
@@ -175,13 +176,13 @@ function updLobby(){const L=NET.lobby;if(mBack()){SFX.back();netLeave();return}i
   if(KP.KeyI||anyPad(i=>padRep(i,'dn'))){netSend({t:'rules',items:((L.items|0)+1)%4});SFX.sel()}if(L.mode=='teams'&&(KP.KeyF||anyPad(i=>padEdge(i,'BK')))){netSend({t:'rules',ff:!L.ff});SFX.sel()}
   if(mStart()||anyPad(i=>padEdge(i,'A'))){netSend({t:'start'});SFX.ok()}}}
 function drawLobby(){const L=NET.lobby;if(!L){text(NET.ws&&NET.ws.readyState==1?'JOINING...':'CONNECTING...',W/2,130,'#ffffff',32,'center');bar([[['B'],'CANCEL']],[[['ESC'],'CANCEL']]);return}
- text(L.quick?'QUICK MATCH':'PRIVATE ROOM',W/2,26,PAL.Y,32,'center');if(!L.quick){panel(W/2-60,32,120,22);text('CODE: '+L.code,W/2,48,'#ffffff',16,'center')}acctBadge(4,4);
- for(let i=0;i<4;i++){const s=L.slots[i],x=8+i*118,y=60;panel(x,y,110,116,i==L.you?'#5d4a6e':'#2b2b40');ctx.fillStyle=PCOL[i];ctx.fillRect(x+1,y+1,108,3);
+ text(L.quick?'QUICK MATCH':'PRIVATE ROOM',W/2,26,PAL.Y,32,'center');if(!L.quick){panel(W/2-60,31,120,19);text('CODE: '+L.code,W/2,46,'#ffffff',16,'center')}acctBadge(W-4,4,'right');
+ for(let i=0;i<4;i++){const s=L.slots[i],x=8+i*118,y=62;panel(x,y,110,116,i==L.you?'#5d4a6e':'#2b2b40');ctx.fillStyle=PCOL[i];ctx.fillRect(x+1,y+1,108,3);
   if(!s){text(L.quick?'SEARCHING':'EMPTY',x+55,y+60,'#8b93a6',16,'center');continue}
-  text(s.name.slice(0,12),x+55,y+20,nameCol(s.cos,PCOL[i]),s.name.length>6?8:16,'center');drawSheet(imgs[s.skin],x+39,y+28,1,2,Math.floor(t/7)%4,2);text(NAMES[s.skin],x+55,y+90,PAL.Y,16,'center');
-  text(s.type=='cpu'?'CPU':i==L.you?'YOU':s.host?'HOST':'PLAYER',x+55,y+106,'#d8dde6',8,'center')}
- const A=ARENAS[L.arena];text(L.quick?'ARENA: RANDOM':'ARENA: \u2190 '+A.name+' \u2192',W/2,188,'#ffffff',16,'center');text(rulesLine(L.quick?'stock':L.mode,L.quick?2:L.items,L.ff),W/2,201,'#ffffff',8,'center');
- let st=L.count>=0?'STARTING IN '+L.count:L.quick?(L.fill>=0?'WAITING FOR PLAYERS... CPU FILL IN '+L.fill:'WAITING FOR PLAYERS...'):L.host?'START WHEN READY (2+ FIGHTERS)':'WAITING FOR HOST TO START';text(st,W/2,216,L.count>=0?PAL.Y:'#d8dde6',st.length>30?8:16,'center');
+  text(s.name.slice(0,12),x+55,y+20,nameCol(s.cos,PCOL[i]),s.name.length>6?8:16,'center');drawSheet(imgs[s.skin],x+39,y+28,1,2,Math.floor(t/7)%4,2);text(NAMES[s.skin],x+55,y+82,PAL.Y,16,'center');
+  text(s.type=='cpu'?'CPU':i==L.you?'YOU':s.host?'HOST':'PLAYER',x+55,y+102,'#d8dde6',8,'center')}
+ const A=ARENAS[L.arena];text(L.quick?'ARENA: RANDOM':'ARENA: \u2190 '+A.name+' \u2192',W/2,192,'#ffffff',16,'center');text(rulesLine(L.quick?'stock':L.mode,L.quick?2:L.items,L.ff),W/2,203,'#ffffff',8,'center');
+ let st=L.count>=0?'STARTING IN '+L.count:L.quick?(L.fill>=0?'WAITING FOR PLAYERS... CPU FILL IN '+L.fill:'WAITING FOR PLAYERS...'):L.host?'START WHEN READY (2+ FIGHTERS)':'WAITING FOR HOST TO START';text(st,W/2,st.length>30?215:218,L.count>=0?PAL.Y:'#d8dde6',st.length>30?8:16,'center');
  if(L.host&&!L.quick){bar([[['LB','RB'],'ARENA'],[['UP'],'MODE'],[['DN'],'ITEMS'],...(L.mode=='teams'?[[['BK'],'FF']]:[]),[['Y','X'],'CPU'],[['A'],'START']],[[['Q','E'],'ARENA'],[['M'],'MODE'],[['I'],'ITEMS'],...(L.mode=='teams'?[[['F'],'FF']]:[]),[['C','BKSP'],'CPU'],[['ENTER'],'START']],242)}
  else bar([[['DP'],'SKIN'],[['B'],'LEAVE']],[[['\u2190','\u2192'],'SKIN'],[['ESC'],'LEAVE']],242)}
 // ===== Shop: see src/cosm.js =====

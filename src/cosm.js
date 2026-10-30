@@ -92,7 +92,7 @@ function drawShop(){const tb=SH.tab;text('STORE',W/2,22,PAL.Y,24,'center');acctB
  if(it.cat=='arena'){PVTH=it.id;try{const bg=bgCanvas(it.th);ctx.drawImage(bg,0,0,W,H,52,98,150,84);const mc=mapCanvas(ARENAS[it.base].map);ctx.drawImage(mc,0,0,mc.width,mc.height,52,98+84-Math.round(150*mc.height/mc.width),150,Math.round(150*mc.height/mc.width))}finally{PVTH=null}}
  else if(it.cat=='pose'){const [px,py,pf]=poseDraw(_drawSheetc,it.id,imgs[sk],84,108,1,2,fr,3);if(myEq().hat)drawHat(myEq().hat,px,py,pf,3);if(it.id=='po_trophy')trophy(px+24,py-14)}
  else{const sv=state;_drawSheetc(imgs[sk],84,108,1,it.cat=='trail'?2:1,it.cat=='trail'?fr:0,3);const h=it.cat=='hat'?it.id:myEq().hat;if(h)drawHat(h,84,108,1,3);
-  if(it.cat=='name'){const nm=ACC.user?ACC.user.name:'PLAYER';text(nm.slice(0,12),108,104,nameCol({name:it.id}),16,'center')}}
+  if(it.cat=='name'){const nm=ACC.user?(ACC.user.name||ACC.user.username||'PLAYER'):'PLAYER';text(nm.slice(0,12),108,104,nameCol({name:it.id}),16,'center')}}
  for(const p of SH.pv){ctx.fillStyle=p.c;const z=p.l>12?3:2;ctx.fillRect(Math.round(p.x),Math.round(p.y),z,z)}
  text(it.n,220,122,PAL.Y,16);text(TABS[tb].n,220,108,'#d8dde6',8);
  if(eqC(it))text('EQUIPPED  (A: REMOVE)',220,146,'#a1e55a',8);else if(ownC(it.id))text('OWNED  (A: EQUIP)',220,146,'#a1e55a',8);

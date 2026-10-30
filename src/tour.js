@@ -24,30 +24,31 @@ const _updLobT=updLobby;updLobby=function(){const L=NET.lobby;
    if(mStart()||anyPad(i=>padEdge(i,'A'))){netSend({t:'start'});SFX.ok()}}return}
  if(L&&!L.quick&&L.mode=='teams'&&(KP.KeyT||anyPad(i=>padEdge(i,'RS')||padEdge(i,'LS')))){netSend({t:'team'});SFX.sel()}_updLobT()};
 const _drawLobT=drawLobby;drawLobby=function(){_drawLobT();const L=NET.lobby;if(!L||L.mode!='teams')return;
- for(let i=0;i<4;i++){const s=L.slots[i];if(!s)continue;const tm=s.team!=null?s.team:i%2,x=8+i*118;ctx.fillStyle=TEAMC[tm];ctx.fillRect(x+1,61,108,5);text('TEAM '+TEAMN[tm],x+55,170,TEAMC[tm],8,'center')}
- if(L.q2)text('2V2 QUICK MATCH - BOTS FILL ON EASY',W/2,56,'#d8dde6',8,'center');else if(!L.quick)text('T: SWITCH TEAM (2 PER TEAM)',W/2,56,'#d8dde6',8,'center')};
+ for(let i=0;i<4;i++){const s=L.slots[i];if(!s)continue;const tm=s.team!=null?s.team:i%2,x=8+i*118;ctx.fillStyle=TEAMC[tm];ctx.fillRect(x+1,63,108,5);text('TEAM '+TEAMN[tm],x+55,174,TEAMC[tm],8,'center')}
+ if(L.q2)text('2V2 QUICK MATCH'+(L.ranked?' - RANKED':'')+' - BOTS FILL ON EASY',W/2,58,'#d8dde6',8,'center');else if(!L.quick)text('T: SWITCH TEAM (2 PER TEAM)',W/2,58,'#d8dde6',8,'center')};
 // --- shared bracket drawing: T={size,rd}, ent=[{name,skin}]
 function drawBracket(T,ent,x0,y0,w,h,cur){const R=T.rd.length,cw=w/R;
  for(let r=0;r<R;r++){const M=T.rd[r],gh=h/M.length;text(PB2.bracketRound(T,r),x0+r*cw+cw/2,y0-4,'#d8dde6',8,'center');
-  M.forEach((m,k)=>{const y=y0+k*gh+gh/2-13,x=x0+r*cw+4,bw=cw-10,live=cur&&cur.r==r&&cur.m==k;panel(x,y,bw,26,live?'#5d4a6e':'#2b2b40');
+  const cmp=gh<28,bh=cmp?Math.max(12,Math.min(16,Math.floor(gh)-2)):26;M.forEach((m,k)=>{const y=Math.round(y0+k*gh+gh/2-bh/2),x=x0+r*cw+4,bw=cw-10,live=cur&&cur.r==r&&cur.m==k;panel(x,y,bw,bh,live?'#5d4a6e':'#2b2b40');
+   if(cmp){const nm=e=>e==null?'-':String((ent[e]||{name:'?'}).name),cl=e=>e==null?'#8b93a6':m.w===e?PAL.Y:m.w!=null?'#5d6377':'#ffffff',mx=Math.floor((bw-16)/10);text(nm(m.a).slice(0,mx),x+4,y+bh/2+3,cl(m.a),8);text('V',x+bw/2,y+bh/2+3,'#8b93a6',8,'center');text(nm(m.b).slice(0,mx),x+bw-4,y+bh/2+3,cl(m.b),8,'right');if(r<R-1){ctx.fillStyle='#8b93a6';ctx.fillRect(x+bw,y+Math.floor(bh/2),10,1)}return}
    [m.a,m.b].forEach((e,j)=>{const yy=y+10+j*12;if(e==null){text('-',x+6,yy,'#8b93a6',8);return}const E=ent[e]||{name:'?'};const won=m.w===e,lost=m.w!=null&&m.w!==e;
     text(String(E.name).slice(0,Math.floor(bw/5)-2),x+6,yy,won?PAL.Y:lost?'#5d6377':'#ffffff',8);if(won)text('>',x+bw-8,yy,PAL.Y,8)});
    if(r<R-1){ctx.fillStyle='#8b93a6';ctx.fillRect(x+bw,y+13,10,1)}})}}
-function drawTourLobby(){const L=NET.lobby;text('TOURNAMENT',W/2,24,PAL.Y,32,'center');acctBadge(4,4);
+function drawTourLobby(){const L=NET.lobby;text('TOURNAMENT',W/2,24,PAL.Y,32,'center');acctBadge(W-4,4,'right');
  if(L.T&&L.ent){panel(W/2-60,30,120,16);text('CODE: '+L.code,W/2,42,'#ffffff',8,'center');drawBracket(L.T,L.ent,8,64,W-16,140,PB2.bracketNext(L.T));
   text(L.tstate=='fight'?'MATCH IN PROGRESS - SPECTATING':'NEXT MATCH STARTING...',W/2,222,PAL.Y,8,'center');bar([[['B'],'LEAVE']],[[['ESC'],'LEAVE']],242);return}
  panel(W/2-60,30,120,22);text('CODE: '+L.code,W/2,46,'#ffffff',16,'center');
  for(let i=0;i<8;i++){const s=L.slots[i],x=8+(i%4)*118,y=58+(i>>2)*60;panel(x,y,110,54,i==L.you?'#5d4a6e':'#2b2b40');
   if(!s){text(i<L.tsize?'OPEN (CPU FILL)':'-',x+55,y+30,'#8b93a6',8,'center');continue}
   drawSheet(imgs[s.skin],x+4,y+12,1,2,Math.floor(t/7)%4,1);text(s.name.slice(0,12),x+30,y+20,nameCol(s.cos,'#ffffff'),8);text(s.type=='cpu'?'CPU':i==L.you?'YOU':s.host?'HOST':'PLAYER',x+30,y+34,'#d8dde6',8)}
- const A=ARENAS[L.arena];text(L.tsize+' ENTRANTS  -  ARENA '+(L.host?'\u2190 '+A.name+' \u2192':A.name)+'  -  ITEMS '+PB2.ITEM_NAMES[L.items|0],W/2,190,'#ffffff',8,'center');
- text('SINGLE ELIMINATION 1V1 - WINNER GETS '+(L.tsize==8?200:100)+' COINS + A TROPHY',W/2,204,'#d8dde6',8,'center');
- text(L.host?'START WHEN READY - EMPTY SEATS BECOME CPUS':'WAITING FOR HOST TO START',W/2,220,L.host?PAL.Y:'#d8dde6',8,'center');
- if(L.host)bar([[['BK'],'SIZE'],[['LB','RB'],'ARENA'],[['DN'],'ITEMS'],[['Y','X'],'CPU'],[['A'],'START']],[[['Z'],'SIZE 4/8'],[['Q','E'],'ARENA'],[['I'],'ITEMS'],[['C','BKSP'],'CPU'],[['ENTER'],'START']],242)}
-function drawTChamp(){const C=TN.champ;if(!C)return;text('CHAMPION!',W/2,36,PAL.Y,32,'center');drawTrophy(W/2-8,46,2);
- drawSheet(imgs[C.skin],W/2-16,84,1,0,Math.floor(t/8)%2,2);text(C.name,W/2,140,'#ffffff',16,'center');
- if(C.you)text('YOU WON THE '+C.size+'-PLAYER TOURNAMENT!  +'+C.coins+' COINS  +1 TROPHY',W/2,158,PAL.Y,8,'center');
- drawBracket(C.T,C.ent,40,176,W-80,40,null);bar([[['A'],'LOBBY'],[['B'],'LEAVE']],[[['ENTER'],'LOBBY'],[['ESC'],'LEAVE']],242)}
+ const A=ARENAS[L.arena];panel(8,182,W-16,48);text(L.tsize+' ENTRANTS  -  ARENA '+(L.host?'\u2190 '+A.name+' \u2192':A.name)+'  -  ITEMS '+PB2.ITEM_NAMES[L.items|0],W/2,196,'#ffffff',8,'center');
+ text('SINGLE ELIMINATION 1V1 - WINNER GETS '+(L.tsize==8?200:100)+' COINS + A TROPHY',W/2,209,'#d8dde6',8,'center');
+ text(L.host?'START WHEN READY - EMPTY SEATS BECOME CPUS':'WAITING FOR HOST TO START',W/2,222,L.host?PAL.Y:'#d8dde6',8,'center');
+ if(!L.host)bar([[['DP'],'SKIN'],[['B'],'LEAVE']],[[['\u2190','\u2192'],'SKIN'],[['ESC'],'LEAVE']],242);else bar([[['BK'],'SIZE'],[['LB','RB'],'ARENA'],[['DN'],'ITEMS'],[['Y','X'],'CPU'],[['A'],'START']],[[['Z'],'SIZE 4/8'],[['Q','E'],'ARENA'],[['I'],'ITEMS'],[['C','BKSP'],'CPU'],[['ENTER'],'START']],242)}
+function drawTChamp(){const C=TN.champ;if(!C)return;text('CHAMPION!',W/2,34,PAL.Y,32,'center');drawTrophy(W/2-8,42,2);
+ drawSheet(imgs[C.skin],W/2-16,72,1,0,Math.floor(t/8)%2,2);text(C.name,W/2,124,'#ffffff',16,'center');
+ if(C.you)text('YOU WON THE '+C.size+'-PLAYER TOURNAMENT!  +'+C.coins+' COINS  +1 TROPHY',W/2,138,PAL.Y,8,'center');
+ drawBracket(C.T,C.ent,20,160,W-40,74,null);bar([[['A'],'LOBBY'],[['B'],'LEAVE']],[[['ENTER'],'LOBBY'],[['ESC'],'LEAVE']],242)}
 function drawTrophy(x,y,s){s=s||1;ctx.fillStyle=PAL.o;ctx.fillRect(x-s,y-s,(8+2)*s,(12+2)*s);ctx.fillStyle='#fee761';ctx.fillRect(x,y,8*s,5*s);ctx.fillRect(x+2*s,y+5*s,4*s,3*s);ctx.fillRect(x+3*s,y+8*s,2*s,2*s);ctx.fillRect(x+1*s,y+10*s,6*s,2*s);ctx.fillStyle='#f99252';ctx.fillRect(x+5*s,y+1*s,1*s,3*s)}
 // trophies on the account badge (profile)
 const _acctBadgeT=acctBadge;acctBadge=function(x,y,al){_acctBadgeT(x,y,al);const n=ACC.user&&ACC.user.trophies|0;if(!n)return;const s=ACC.user.username+'  ',w=s.length*4+String(ACC.user.coins).length*4+20,x0=(al=='right'?x-w:x)+w+2;
@@ -99,6 +100,6 @@ function drawLTSetup(){text('TOURNAMENT',W/2,40,PAL.Y,32,'center');panel(W/2-120
  bar([[['A'],'OK'],[['B'],'BACK']],[[['ENTER'],'OK'],[['ESC'],'BACK']],242)}
 function drawLTBracket(){text('TOURNAMENT BRACKET',W/2,24,PAL.Y,24,'center');const n=PB2.bracketNext(LT.T);drawBracket(LT.T,LT.ent,8,52,W-16,150,n);
  if(n)text('NEXT: '+LT.ent[n.a].name+' VS '+LT.ent[n.b].name,W/2,220,'#ffffff',16,'center');bar([[['A'],'FIGHT'],[['B'],'QUIT']],[[['ENTER'],'FIGHT'],[['ESC'],'QUIT']],242)}
-function drawLTChamp(){const C=LT.champ;if(!C)return;text('CHAMPION!',W/2,36,PAL.Y,32,'center');drawTrophy(W/2-8,46,2);drawSheet(imgs[C.skin],W/2-16,84,1,0,Math.floor(t/8)%2,2);
- text(C.name,W/2,140,'#ffffff',16,'center');if(LT.res)text(LT.res.coins?'+'+LT.res.coins+' COINS'+(LT.res.capped?' (DAILY CAP)':''):C.human?(LT.res.why?'TOO SHORT FOR COINS':'DAILY CAP REACHED'):'CPU WINS - NO COINS',W/2,158,PAL.Y,8,'center');
- drawBracket(LT.T,LT.ent,40,176,W-80,40,null);bar([[['A'],'MENU']],[[['ENTER'],'MENU']],242)}
+function drawLTChamp(){const C=LT.champ;if(!C)return;text('CHAMPION!',W/2,34,PAL.Y,32,'center');drawTrophy(W/2-8,42,2);drawSheet(imgs[C.skin],W/2-16,72,1,0,Math.floor(t/8)%2,2);
+ text(C.name,W/2,124,'#ffffff',16,'center');if(LT.res)text(LT.res.coins?'+'+LT.res.coins+' COINS'+(LT.res.capped?' (DAILY CAP)':''):C.human?(LT.res.why?'TOO SHORT FOR COINS':'DAILY CAP REACHED'):'CPU WINS - NO COINS',W/2,138,PAL.Y,8,'center');
+ drawBracket(LT.T,LT.ent,20,160,W-40,74,null);bar([[['A'],'MENU']],[[['ENTER'],'MENU']],242)}
