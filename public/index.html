@@ -715,6 +715,7 @@ function netMsg(m){if(m.t=='lobby'){NET.lobby=m;if(state=='online'||state=='join
   for(const e of m.ev||[]){if(e[0]=='s'){SFX[e[1]]&&SFX[e[1]](e[2])}else if(e[0]=='k')addShake(e[1]);else if(e[0]=='b')burst(e[1],e[2],e[3],e[4],e[5]);else if(e[0]=='o')koFx(e[2],e[3],e[1],e[4]);else if(e[0]=='p')partFx(e[1],e[2])}}
  else if(m.t=='end'){NET.res=m;chalToast(m.chal);if(ACC.user&&m.coins!=null)ACC.user.coins=m.coins;const r=m.rank.find(r=>r.i==NET.you);if(r&&r.coins)setTimeout(()=>SFX.coin(),900);if(state=='settings')state='oresult';else state='oresult';opause=false}
  else if(m.t=='user'){ACC.user=m.user}
+ else if(m.t=='notice'){toast(String(m.m||''))}
  else if(m.t=='err'){toast(m.m);SFX.err();if(m.fatal&&state=='lobby')state='online'}}
 function netInput(){const any=a=>a.some(k=>K[k]),anyP=a=>a.some(k=>KP[k]);const o={};
  for(const m of [KEYMAP[0],KEYMAP[3]]){for(const k of ['l','r','u','d','a','s','x'])o[k]=o[k]||any(m[k]);o.upE=o.upE||anyP(m.u);o.dE=o.dE||anyP(m.d);o.ap=o.ap||anyP(m.a);o.sp=o.sp||anyP(m.s);o.xp=o.xp||anyP(m.x)}
@@ -802,6 +803,10 @@ const _drawC=draw;draw=function(){_drawC();if(!ONLINE)return;ctx.save();ctx.setT
   else if(LC.res){const r=LC.res;coinIcon(W/2-60,176);text('+'+r.coins+' COINS   TOTAL '+ACC.user.coins,W/2-50,183,'#fee761',8);text(r.coins?bdText(r.breakdown)+(r.capped?'  (DAILY CAP)':''):(r.why||'DAILY LOCAL CAP REACHED').toUpperCase(),W/2,192,'#d8dde6',8,'center')}});
  if(state=='select'&&!ACC.user)safe(()=>text('LOG IN VIA ONLINE TO EARN COINS + UNLOCK SKINS',W/2,133,'#f99252',8,'center'));
  ctx.restore()}
+
+// admin overrides: server-set prices / disabled items (server enforces; this only keeps the shop display in sync)
+function loadShopCfg(){fetch('/api/shop/config').then(r=>r.json()).then(c=>{for(const k in c.ov||{}){const o=c.ov[k],m=/^skin:(\d+)$/.exec(k),i=/^item:(.+)$/.exec(k);if(m&&Number.isInteger(o.p))PRICES[+m[1]]=o.p;if(i&&COS_BY[i[1]]){if(Number.isInteger(o.p))COS_BY[i[1]].p=o.p;COS_BY[i[1]].off=!!o.off}}if(c.banner)toast(c.banner)}).catch(()=>{})}
+try{loadShopCfg()}catch(e){}
 
 // ===== Feature pack: ranked / leaderboard =====
 const TIERS=PDBCore.TIERS;

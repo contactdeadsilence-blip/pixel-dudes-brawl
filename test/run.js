@@ -3,7 +3,7 @@
 const PDBP=require('../shared/core.js').PRICES;
 const path=require('path'),fs=require('fs'),os=require('os'),assert=require('assert');
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'pdb-'));
-Object.assign(process.env,{DB_PATH:path.join(tmp,'t.db'),MATCH_TIME_S:'12',QUICK_FILL_MS:'3000',COUNTDOWN_MS:'1000',TOUR_GAP_MS:'300'});
+Object.assign(process.env,{DB_PATH:path.join(tmp,'t.db'),MATCH_TIME_S:'12',QUICK_FILL_MS:'3000',COUNTDOWN_MS:'1000',TOUR_GAP_MS:'300',ADMIN_KEY:'test-admin-key-0123456789'});
 const {server,db}=require('../server/index.js');const WebSocket=require('ws');
 let B;const errors=[];process.on('uncaughtException',e=>{errors.push(e);console.error(e)});
 const api=(p,body,tok)=>fetch(B+'/api/'+p,{method:body?'POST':'GET',headers:Object.assign({'Content-Type':'application/json'},tok?{Authorization:'Bearer '+tok}:{}),body:body?JSON.stringify(body):undefined}).then(async r=>({status:r.status,j:await r.json()}));
@@ -46,11 +46,25 @@ const wait=(f,ms,what)=>new Promise((res,rej)=>{const t0=Date.now(),h=setInterva
  await db.run("UPDATE users SET coins=coins+200 WHERE username='alice'");const before=(await api('me',null,A)).j.user.coins;
  r=await api('shop/buy',{skin:4},A);assert.equal(r.status,200);assert(r.j.user.unlocked.includes(4));assert.equal(r.j.user.coins,before-PDBP[4]);
  r=await api('shop/buy',{skin:4},A);assert.equal(r.status,409);console.log('skin purchase OK, coins',before,'->',before-PDBP[4]);
+ // --- admin API: refuses without/with wrong key; price override is enforced by the server
+ {const adm=(p,b,k)=>fetch(B+'/api/admin/'+p,{method:b?'POST':'GET',headers:Object.assign({'Content-Type':'application/json'},k?{'x-admin-key':k}:{}),body:b?JSON.stringify(b):undefined}).then(async r=>({status:r.status,j:await r.json()}));const AK='test-admin-key-0123456789';
+  for(const p of ['stats','items','props'])assert.equal((await adm(p)).status,401,'admin '+p+' without key');
+  assert.equal((await adm('item',{key:'skin:5',price:1})).status,401);assert.equal((await adm('item',{key:'skin:5',price:1},'wrong-key-wrong-key-xx')).status,401);
+  assert.equal((await adm('kick',{id:1})).status,401);assert.equal((await adm('maintenance',{on:true})).status,401);
+  r=await adm('item',{key:'skin:5',price:1},AK);assert.equal(r.status,200);assert.equal((await adm('item',{key:'skin:5',price:-3},AK)).status,400);
+  const c0=(await api('me',null,A)).j.user.coins;r=await api('shop/buy',{skin:5},A);assert.equal(r.status,200);assert.equal(r.j.user.coins,c0-1,'admin price applied');
+  await adm('item',{key:'skin:6',off:true},AK);assert.equal((await api('shop/buy',{skin:6},A)).status,403,'disabled item');await adm('item',{key:'skin:6',off:false},AK);await adm('item',{key:'skin:5',price:null},AK);
+  const zlib=require('zlib'),crc=b=>{let c=~0;for(const x of b){c^=x;for(let k=0;k<8;k++)c=c&1?(c>>>1)^0xedb88320:c>>>1}return ~c>>>0},ch=(t,d)=>{const l=Buffer.alloc(4);l.writeUInt32BE(d.length);const td=Buffer.concat([Buffer.from(t),d]),c=Buffer.alloc(4);c.writeUInt32BE(crc(td));return Buffer.concat([l,td,c])};
+  const png=(w,h)=>{const ih=Buffer.alloc(13);ih.writeUInt32BE(w,0);ih.writeUInt32BE(h,4);ih[8]=8;ih[9]=6;return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),ch('IHDR',ih),ch('IDAT',zlib.deflateSync(Buffer.alloc((w*4+1)*h))),ch('IEND',Buffer.alloc(0))])};
+  r=await adm('prop',{name:'crate',png:png(16,16).toString('base64')},AK);assert.equal(r.status,200);const pid=r.j.props[0].id;
+  assert.equal((await adm('prop',{name:'big',png:png(200,10).toString('base64')},AK)).status,400,'oversize png');
+  const img=await fetch(B+'/api/props/'+pid+'.png');assert.equal(img.headers.get('content-type'),'image/png');
+  r=await adm('stats',null,AK);assert.equal(r.status,200);assert.equal(r.j.maint,false);console.log('admin API OK (key required, price override enforced, png prop stored)')}
 // --- cosmetics: validation, buy, equip
  const CB=require('../shared/core.js').COS_BY;
  r=await api('shop/item',{item:'nope'},A);assert.equal(r.status,400,'unknown item');
  r=await api('shop/item',{item:'hat_halo'},A);assert.equal(r.status,402,'unaffordable item');
- r=await api('shop/item',{item:'hat_cap'},G);assert.equal(r.status,402,'guest broke');
+ await db.run("UPDATE users SET coins=0 WHERE id=(SELECT user_id FROM sessions WHERE token=?)",[G]);r=await api('shop/item',{item:'hat_cap'},G);assert.equal(r.status,402,'guest broke');
  await db.run("UPDATE users SET coins=coins+500 WHERE username='alice'");const cb=(await api('me',null,A)).j.user.coins;
  r=await api('shop/item',{item:'hat_crown'},A);assert.equal(r.status,200);assert(r.j.user.cosm.own.includes('hat_crown'));assert.equal(r.j.user.cosm.eq.hat,'hat_crown');assert.equal(r.j.user.coins,cb-CB.hat_crown.p);
  r=await api('shop/item',{item:'hat_crown'},A);assert.equal(r.status,409,'double buy');

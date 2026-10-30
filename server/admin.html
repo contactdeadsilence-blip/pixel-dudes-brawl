@@ -1,0 +1,33 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Pixel Dudes Brawl - Admin</title><meta name="robots" content="noindex">
+<style>body{font:14px monospace;background:#111;color:#eee;margin:20px;max-width:900px}h2{color:#fc0;border-bottom:1px solid #444}button{margin:2px}input{background:#222;color:#eee;border:1px solid #555;padding:3px}table{border-collapse:collapse}td,th{padding:2px 8px;border-bottom:1px solid #333}.off{opacity:.5}#msg{color:#6f6}.box{background:#1b1b1b;padding:8px;border:1px solid #333}</style></head><body>
+<h1>Pixel Dudes Brawl - Admin</h1>
+<div id="login"><input id="key" type="password" placeholder="ADMIN_KEY" size="40"> <button onclick="saveKey()">Unlock</button></div>
+<div id="msg"></div><div id="main" hidden>
+<h2>Server</h2><div class="box"><div id="stats"></div><button onclick="stats()">Refresh</button>
+ <p>Maintenance (blocks new matches): <b id="mt"></b> <button onclick="maint(true)">ON</button><button onclick="maint(false)">OFF</button></p>
+ <p>Broadcast banner: <input id="bc" maxlength="60" size="40"> <button onclick="bcast()">Send</button> <button onclick="bc.value='';bcast()">Clear</button></p></div>
+<h2>Prices &amp; items</h2><table id="items"></table>
+<h2>Props (PNG upload)</h2><div class="box"><p>PNG only, max <b>128x128 px</b> and 64 KB. Draw at the game's pixel scale: a fighter is about <b>16x24 px</b>, so props work best at <b>16x16, 32x32 or 64x32</b>. Use a transparent background, no anti-aliasing.</p>
+ Name <input id="pn" maxlength="24"> <input id="pf" type="file" accept="image/png"> <button onclick="upload()">Upload</button><table id="props"></table></div></div>
+<script>
+let K=sessionStorage.getItem('ak')||'';const $=id=>document.getElementById(id);
+function say(t,bad){$('msg').textContent=t;$('msg').style.color=bad?'#f66':'#6f6'}
+async function api(p,b){const r=await fetch('/api/admin/'+p,{method:b?'POST':'GET',headers:{'Content-Type':'application/json','x-admin-key':K},body:b?JSON.stringify(b):undefined});const j=await r.json().catch(()=>({}));
+ if(r.status==401||r.status==503){$('main').hidden=true;$('login').hidden=false;say(j.error||'denied',1);throw 0}if(!r.ok){say(j.error||'error',1);throw 0}return j}
+function saveKey(){K=$('key').value;sessionStorage.setItem('ak',K);boot()}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>'&#'+c.charCodeAt(0)+';');
+async function stats(){const s=await api('stats');$('mt').textContent=s.maint?'ON':'OFF';$('bc').value=s.banner||'';
+ $('stats').innerHTML=`<p>Online: <b>${s.online}</b> &nbsp; Rooms: <b>${s.rooms.length}</b> &nbsp; Accounts: <b>${s.users}</b></p><table><tr><th>id</th><th>player</th><th>room</th><th></th></tr>`+
+ s.players.map(p=>`<tr><td>${p.id}</td><td>${esc(p.name)}</td><td>${p.room||'-'}</td><td><button onclick="kick(${p.id})">Kick</button></td></tr>`).join('')+'</table>'}
+async function maint(on){await api('maintenance',{on});say('Maintenance '+(on?'ON':'OFF'));stats()}
+async function bcast(){await api('broadcast',{msg:$('bc').value});say('Banner set');}
+async function kick(id){if(!confirm('Kick player '+id+'?'))return;const r=await api('kick',{id});say('Kicked '+r.kicked+' connection(s)');stats()}
+async function items(){const r=await api('items');$('items').innerHTML='<tr><th>item</th><th>base</th><th>price</th><th>enabled</th></tr>'+r.items.map(i=>
+ `<tr class="${i.off?'off':''}"><td>${esc(i.name)}</td><td>${i.base}</td><td><input size="6" value="${i.price}" onchange="setP('${esc(i.key)}',this.value)"></td><td><input type="checkbox" ${i.off?'':'checked'} onchange="setOff('${esc(i.key)}',!this.checked)"></td></tr>`).join('')}
+async function setP(key,v){await api('item',{key,price:v===''?null:parseInt(v,10)});say('Price saved');items()}
+async function setOff(key,off){await api('item',{key,off});say(off?'Disabled':'Enabled');items()}
+async function props(){const r=await api('props');$('props').innerHTML=r.props.map(p=>`<tr class="${p.enabled?'':'off'}"><td><img src="/api/props/${p.id}.png" style="image-rendering:pixelated;width:${p.w*2}px"></td><td>${esc(p.name)}</td><td>${p.w}x${p.h}</td><td><button onclick="ptog(${p.id},${p.enabled?0:1})">${p.enabled?'Disable':'Enable'}</button><button onclick="pdel(${p.id})">Delete</button></td></tr>`).join('')}
+async function ptog(id,on){await api('prop/toggle',{id,on});props()}async function pdel(id){if(confirm('Delete prop?')){await api('prop/delete',{id});props()}}
+function upload(){const f=$('pf').files[0];if(!f)return say('Pick a PNG',1);const rd=new FileReader();rd.onload=async()=>{await api('prop',{name:$('pn').value,png:rd.result});say('Uploaded');props()};rd.readAsDataURL(f)}
+async function boot(){if(!K)return;try{await stats();$('login').hidden=true;$('main').hidden=false;say('');items();props()}catch(e){}}boot();
+</script></body></html>

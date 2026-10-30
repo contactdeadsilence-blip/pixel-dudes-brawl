@@ -9,7 +9,7 @@ const TOUR_GAP_MS=+process.env.TOUR_GAP_MS||4000,TOUR_PRIZE={4:100,8:200},TOUR_L
 const QUICK_FILL_MS=+process.env.QUICK_FILL_MS||15000,COUNTDOWN_MS=+process.env.COUNTDOWN_MS||5000;
 const db=require('./db.js')();
 const SESS_MS=90*864e5;
-const ready=db.init().then(()=>db.run('DELETE FROM sessions WHERE created<?',[Date.now()-SESS_MS])).then(()=>console.log('db ready ('+db.kind+')'));
+const ADM={};const ready=db.init().then(()=>ADM.load()).then(()=>db.run('DELETE FROM sessions WHERE created<?',[Date.now()-SESS_MS])).then(()=>console.log('db ready ('+db.kind+')'));
 ready.catch(e=>{console.error('DB INIT FAILED',e);process.exit(1)});
 const q={byName:n=>db.get('SELECT * FROM users WHERE lower(username)=lower(?)',[n]),byId:id=>db.get('SELECT * FROM users WHERE id=?',[id]),
  ins:(n,p,un,g)=>db.get('INSERT INTO users(username,pass,coins,unlocked,guest,created) VALUES(?,?,0,?,?,?) RETURNING *',[n,p,un,g,Date.now()]),
@@ -86,16 +86,16 @@ app.post('/api/settings',auth,H(async(req,res)=>{const s=req.body&&req.body.sett
 app.post('/api/shop/buy',auth,H(async(req,res)=>{const skin=req.body&&req.body.skin;
  if(!Number.isInteger(skin)||skin<0||skin>=NS)return res.status(400).json({error:'unknown skin'});
  const u=await q.byId(req.user.id),un=JSON.parse(u.unlocked);if(un.includes(skin))return res.status(409).json({error:'already unlocked'});
- const price=PDB.PRICES[skin];if(u.coins<price)return res.status(402).json({error:'not enough coins'});un.push(skin);un.sort((a,b)=>a-b);
+ if(ADM.off('skin:'+skin))return res.status(403).json({error:'item disabled'});const price=ADM.price('skin:'+skin,PDB.PRICES[skin]);if(u.coins<price)return res.status(402).json({error:'not enough coins'});un.push(skin);un.sort((a,b)=>a-b);
  // atomic compare-and-set: fails if coins dropped or unlocks changed since we read them
  const r=await db.run('UPDATE users SET coins=coins-?,unlocked=? WHERE id=? AND coins>=? AND unlocked=?',[price,JSON.stringify(un),u.id,price,u.unlocked]);
  if(r.changes!=1)return res.status(409).json({error:'try again'});await db.run('INSERT INTO purchases(user_id,skin,price,ts) VALUES(?,?,?,?)',[u.id,skin,price,Date.now()]);
  res.json({user:pub(await q.byId(req.user.id))})}));
 // cosmetics: same optimistic compare-and-set guard as skins (coins and the cosm JSON must be unchanged since read)
-app.post('/api/shop/item',auth,H(async(req,res)=>{const id=req.body&&req.body.item,it=typeof id=='string'&&PDB.COS_BY[id];if(!it)return res.status(400).json({error:'unknown item'});
- const u=await q.byId(req.user.id),c=PDB.cosParse(u.cosm);if(c.own.includes(id))return res.status(409).json({error:'already owned'});if(u.coins<it.p)return res.status(402).json({error:'not enough coins'});
- c.own.push(id);c.eq[it.cat]=id;const r=await db.run('UPDATE users SET coins=coins-?,cosm=? WHERE id=? AND coins>=? AND cosm '+(db.kind=='pg'?'IS NOT DISTINCT FROM':'IS')+' ?',[it.p,JSON.stringify(c),u.id,it.p,u.cosm]);
- if(r.changes!=1)return res.status(409).json({error:'try again'});await db.run('INSERT INTO purchases(user_id,skin,price,ts,item) VALUES(?,?,?,?,?)',[u.id,-1,it.p,Date.now(),id]);
+app.post('/api/shop/item',auth,H(async(req,res)=>{const id=req.body&&req.body.item,it=typeof id=='string'&&PDB.COS_BY[id];if(!it)return res.status(400).json({error:'unknown item'});if(ADM.off('item:'+id))return res.status(403).json({error:'item disabled'});const ip=ADM.price('item:'+id,it.p);
+ const u=await q.byId(req.user.id),c=PDB.cosParse(u.cosm);if(c.own.includes(id))return res.status(409).json({error:'already owned'});if(u.coins<ip)return res.status(402).json({error:'not enough coins'});
+ c.own.push(id);c.eq[it.cat]=id;const r=await db.run('UPDATE users SET coins=coins-?,cosm=? WHERE id=? AND coins>=? AND cosm '+(db.kind=='pg'?'IS NOT DISTINCT FROM':'IS')+' ?',[ip,JSON.stringify(c),u.id,ip,u.cosm]);
+ if(r.changes!=1)return res.status(409).json({error:'try again'});await db.run('INSERT INTO purchases(user_id,skin,price,ts,item) VALUES(?,?,?,?,?)',[u.id,-1,ip,Date.now(),id]);
  res.json({user:pub(await q.byId(req.user.id))})}));
 app.post('/api/shop/equip',auth,H(async(req,res)=>{const b=req.body||{},cat=b.cat,id=b.item;if(!PDB.COS_CATS.includes(cat))return res.status(400).json({error:'unknown category'});
  const u=await q.byId(req.user.id),c=PDB.cosParse(u.cosm);if(id==null)delete c.eq[cat];else{const it=PDB.COS_BY[id];if(!it||it.cat!=cat)return res.status(400).json({error:'unknown item'});if(!c.own.includes(id))return res.status(403).json({error:'not owned'});c.eq[cat]=id}
@@ -144,6 +144,7 @@ app.post('/api/friends/invite',auth,noGuest,H(async(req,res)=>{const t=await tar
  const code=String((req.body||{}).code||'').toUpperCase(),r=rooms.get(code);if(!r||r.quick||r.state!='lobby'||!r.slots.some(s=>s&&s.uid==me))return res.status(400).json({error:'JOIN A PRIVATE ROOM FIRST'});
  const L=(INV.get(t.id)||[]).filter(i=>!(i.from==req.user.username&&i.code==code)&&Date.now()-i.at<300000);L.push({from:req.user.username,code,at:Date.now()});INV.set(t.id,L.slice(-10));res.json({ok:true,msg:'INVITED '+t.username})}));
 app.get('/healthz',(req,res)=>res.json({ok:true,rooms:rooms.size}));
+require('./admin.js')(app,{db,PDB,get rooms(){return rooms},get wss(){return wss},send:(ws,o)=>{if(ws&&ws.readyState==1)ws.send(JSON.stringify(o))},ADM});
 app.use(express.static(path.join(__dirname,'..','public')));
 
 // ===== Rooms =====
@@ -175,7 +176,7 @@ function addCPU(r){const i=r.slots.findIndex(s=>!s);if(i<0)return;const used=r.s
  r.slots[i]={type:'cpu',name:r.tour?CPU_NAMES[i%CPU_NAMES.length]:'CPU',skin:sk,kos:0};r.slots[i].team=pickTeam(r)}
 // arena theme: the host's equipped theme, if it reskins the arena being played
 function roomTheme(r){const h=r.slots.find(s=>s&&s.ws&&s.ws===r.host),id=h&&h.cos&&h.cos.arena,it=id&&PDB.COS_BY[id];return it&&it.base==r.arena?id:null}
-function startMatch(r){r.state='fight';r.countAt=0;r.fillAt=0;if(r.quick)r.arena=Math.floor(Math.random()*PDB.ARENAS_N);
+function startMatch(r){if(ADM.maint)return;r.state='fight';r.countAt=0;r.fillAt=0;if(r.quick)r.arena=Math.floor(Math.random()*PDB.ARENAS_N);
  const ev=[];r.ev=ev;r.slots.forEach(s=>{if(s)s.kos=0});
  r.core=PDB.createCore({sfx:(k,a)=>ev.push(a!=null?['s',k,a]:['s',k]),shake:v=>ev.push(['k',v]),burst:(x,y,c,n,sp)=>{if(ev.length<200)ev.push(['b',Math.round(x),Math.round(y),c,n,sp])},
   part:(x,y)=>{if(ev.length<200)ev.push(['p',Math.round(x),Math.round(y)])},ko:f=>ev.push(['o',f.i,Math.round(f.x),Math.round(f.y),f.lastHit!=null&&f.lastHit!=f.i?f.lastHit:-1]),
@@ -236,7 +237,7 @@ wss.on('connection',(ws,req)=>{const tok=new URL(req.url,'http://x').searchParam
   if(!u){send(ws,{t:'err',m:'LOG IN FIRST',fatal:true});ws.close();return null}if(closed)return null;ws.user=u;WSU.set(u.id,(WSU.get(u.id)||0)+1);
   ws.on('close',()=>{WSU.set(u.id,Math.max(0,(WSU.get(u.id)||1)-1))});return u});
  ws.on('close',()=>{closed=true});
- ws.on('message',async d=>{if(!await authed||closed)return;let m;try{m=JSON.parse(d)}catch(e){return}if(!m||typeof m.t!='string')return;if(['quick','create','join'].includes(m.t))await refreshUser(ws);const r=ws.room;
+ ws.on('message',async d=>{if(!await authed||closed)return;let m;try{m=JSON.parse(d)}catch(e){return}if(!m||typeof m.t!='string')return;if(['quick','create','join'].includes(m.t))await refreshUser(ws);if(ADM.maint&&['quick','quick2','create','join','tcreate'].includes(m.t)){send(ws,{t:'err',m:'MAINTENANCE - TRY LATER',fatal:true});return}const r=ws.room;
   switch(m.t){
    case 'quick':{if(r)leave(ws);let room=[...rooms.values()].find(x=>x.quick&&!x.q2&&x.state=='lobby'&&humans(x).length<4&&x.slots.some(s=>!s));if(!room)room=newRoom(true);join(room,ws);break}
    case 'create':{if(r)leave(ws);join(newRoom(false),ws);break}

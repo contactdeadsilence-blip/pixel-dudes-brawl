@@ -11,6 +11,8 @@ CREATE INDEX IF NOT EXISTS earn_ud ON earn(user_id,day,kind);
 CREATE TABLE IF NOT EXISTS once_day(user_id INTEGER,day TEXT,kind TEXT,PRIMARY KEY(user_id,day,kind));
 CREATE TABLE IF NOT EXISTS chal(user_id INTEGER,day TEXT,slot INTEGER,cid TEXT,prog INTEGER DEFAULT 0,done INTEGER DEFAULT 0,PRIMARY KEY(user_id,day,slot));
 CREATE TABLE IF NOT EXISTS friends(a INTEGER,b INTEGER,status INTEGER DEFAULT 0,created BIGINT,PRIMARY KEY(a,b));
+CREATE TABLE IF NOT EXISTS admin_kv(k TEXT PRIMARY KEY,v TEXT);
+CREATE TABLE IF NOT EXISTS props(id SERIAL PRIMARY KEY,name TEXT,w INTEGER,h INTEGER,data TEXT,enabled INTEGER DEFAULT 1,created BIGINT);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS cosm TEXT DEFAULT '{}';
 ALTER TABLE purchases ADD COLUMN IF NOT EXISTS item TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS trophies INTEGER DEFAULT 0;`;
@@ -20,7 +22,9 @@ CREATE TABLE IF NOT EXISTS purchases(id INTEGER PRIMARY KEY,user_id INTEGER,skin
 CREATE TABLE IF NOT EXISTS earn(user_id INTEGER,day TEXT,kind TEXT,amt INTEGER);
 CREATE TABLE IF NOT EXISTS once_day(user_id INTEGER,day TEXT,kind TEXT,PRIMARY KEY(user_id,day,kind));
 CREATE TABLE IF NOT EXISTS chal(user_id INTEGER,day TEXT,slot INTEGER,cid TEXT,prog INTEGER DEFAULT 0,done INTEGER DEFAULT 0,PRIMARY KEY(user_id,day,slot));
-CREATE TABLE IF NOT EXISTS friends(a INTEGER,b INTEGER,status INTEGER DEFAULT 0,created INTEGER,PRIMARY KEY(a,b));`;
+CREATE TABLE IF NOT EXISTS friends(a INTEGER,b INTEGER,status INTEGER DEFAULT 0,created INTEGER,PRIMARY KEY(a,b));
+CREATE TABLE IF NOT EXISTS admin_kv(k TEXT PRIMARY KEY,v TEXT);
+CREATE TABLE IF NOT EXISTS props(id INTEGER PRIMARY KEY,name TEXT,w INTEGER,h INTEGER,data TEXT,enabled INTEGER DEFAULT 1,created INTEGER);`;
 function makePg(url,opts){
  const pg=require('pg');pg.types.setTypeParser(20,v=>parseInt(v,10));pg.types.setTypeParser(1700,v=>parseFloat(v));
  const ssl=/localhost|127\.0\.0\.1/.test(url)||process.env.PGSSL=='0'?false:{rejectUnauthorized:false};
