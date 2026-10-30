@@ -68,6 +68,12 @@ const wait=(f,ms,what)=>new Promise((res,rej)=>{const t0=Date.now(),h=setInterva
  await new Promise(r=>setTimeout(r,2000));clearInterval(c2.bot);c2.ws.close();await new Promise(r=>setTimeout(r,500));
  const fl=c1.last.F[1][7];assert(fl&4,'disconnected player became CPU');console.log('disconnect -> CPU takeover OK');
  await wait(()=>c1.end,30000,'private end');console.log('private match ended, winner',c1.end.winner);
+ // --- solo signed-in player vs 1 CPU in a private room: counts toward games/rating -> shows on leaderboard; EASY bot gains capped
+ {r=await api('register',{username:'solo',password:'pw1234'});const S=r.j.token;const cs=client(S,'solo');await cs.open;cs.send({t:'create'});await wait(()=>cs.lobby&&!cs.lobby.quick,2000,'solo room');
+  cs.send({t:'addcpu'});await wait(()=>cs.lobby.slots.filter(Boolean).length==2,2000,'solo cpu');cs.send({t:'start'});await wait(()=>cs.start,3000,'solo start');await wait(()=>cs.end,30000,'solo end');
+  const me=cs.end.rank.find(x=>x.i==cs.you);assert(me&&me.rank,'rating change sent to client vs bots');assert(me.rank.delta<=5,'EASY bot gains capped');
+  const lb=await api('leaderboard',null,S);const row=lb.j.top.find(x=>x.username=='solo');assert(row&&row.games==1,'solo-vs-bot player on leaderboard');assert.equal(row.wins,cs.end.winner==cs.you?1:0);
+  console.log('solo vs CPU ranked OK, delta',me.rank.delta,'winner',cs.end.winner==cs.you?'solo':'cpu/draw');clearInterval(cs.bot);cs.ws.close()}
  // --- bracket logic (pure)
  const PC=require('../shared/core.js');for(const n of [4,8]){const b=PC.bracketNew(n);let x,k=0;assert.equal(PC.bracketReport(b,1,0,0),false,'cannot report unfilled match');
   while(x=PC.bracketNext(b)){assert.equal(PC.bracketReport(b,x.r,x.m,99),false,'winner must be a player');assert(PC.bracketReport(b,x.r,x.m,Math.max(x.a,x.b)));assert.equal(PC.bracketReport(b,x.r,x.m,x.a),false,'no double report');k++}

@@ -107,10 +107,16 @@ app.get('/api/leaderboard',H(async(req,res)=>{const t=(req.get('authorization')|
  const top=await db.all('SELECT username,rating,games,wins FROM users WHERE guest=0 AND games>0 ORDER BY rating DESC,wins DESC LIMIT 50');
  const pos=u&&!u.guest&&u.games?(await db.get('SELECT COUNT(*)+1 n FROM users WHERE guest=0 AND games>0 AND rating>?',[u.rating])).n:null;
  res.json({top:top.map((r,k)=>Object.assign(r,{pos:k+1,tier:PDB.tierOf(r.rating)})),me:u&&!u.guest?{username:u.username,rating:u.rating,games:u.games,tier:PDB.tierOf(u.rating),pos}:null})}));
-// Elo across placements: every pair of ranked (non-guest) humans is a game; K scaled by field size
-async function rateMatch(order){const P=order.filter(x=>x.uid&&!x.guest);const n=P.length;const out={};if(n<2)return out;const K=32/(n-1);
+// Elo across placements: every pair of ranked (non-guest) humans is a game; K scaled by field size.
+// CPU opponents also count (so solo-vs-bots online play ranks you), but against a fixed bot rating, half K, and EASY gains are damped + capped to stop farming.
+const BOT_R=[800,1000,1200],BOT_K=16,EASY_GAIN_MULT=.5,EASY_GAIN_CAP=5;
+async function rateMatch(order,diff){const P=order.filter(x=>x.uid&&!x.guest),B=order.filter(x=>x.bot);const out={};if(!P.length||(P.length<2&&!B.length))return out;
+ const opp=P.length-1+B.length,K=32/opp,KB=BOT_K/opp,d0=Math.max(0,Math.min(2,diff|0)),br=BOT_R[d0];
  const R=[];for(const x of P)R.push((await q.byId(x.uid)).rating);
- for(let i=0;i<n;i++){const a=P[i];let d=0;P.forEach((b,j)=>{if(i==j)return;const e=1/(1+Math.pow(10,(R[j]-R[i])/400)),sc=a.place<b.place?1:a.place>b.place?0:.5;d+=K*(sc-e)});
+ for(let i=0;i<P.length;i++){const a=P[i],sc=(o)=>a.place<o.place?1:a.place>o.place?0:.5;let d=0;
+  P.forEach((b,j)=>{if(i==j)return;const e=1/(1+Math.pow(10,(R[j]-R[i])/400));d+=K*(sc(b)-e)});
+  let db_=0;B.forEach(b=>{const e=1/(1+Math.pow(10,(br-R[i])/400));db_+=KB*(sc(b)-e)});
+  if(d0==0&&db_>0)db_=Math.min(EASY_GAIN_CAP,db_*EASY_GAIN_MULT);d+=db_;
   const nr=Math.max(0,Math.round(R[i]+d));await db.run('UPDATE users SET rating=?,games=games+1,wins=wins+? WHERE id=?',[nr,a.won?1:0,a.uid]);out[a.uid]={old:R[i],rating:nr,delta:nr-R[i],tier:PDB.tierOf(nr)}}return out}
 // ===== Friends + invites =====
 const fq={get:(a,b,c,d)=>db.get('SELECT * FROM friends WHERE (a=? AND b=?) OR (a=? AND b=?)',[a,b,c,d]),ins:(a,b)=>db.run('INSERT INTO friends(a,b,status,created) VALUES(?,?,0,?) ON CONFLICT DO NOTHING',[a,b,Date.now()]),
@@ -194,7 +200,7 @@ async function finishMatch(r){const c=r.core,w=c.winner;
  const all=c.rank(),rank=[];
  for(const f of all){const s=r.slots[f.i];let coins=0,bd=null;if(s&&s.type=='human'&&s.uid){const place=all.indexOf(f),won=w&&w.i==f.i;bd={part:REWARD.part,ko:REWARD.ko*Math.min(s.kos,9),place:w?REWARD.place[place]||0:0};coins=await grant(s.uid,'online',bd.part+bd.ko+bd.place);if(won)coins+=(bd.firstWin=await onceToday(s.uid,'firstwin',REWARD.firstWin))}
   if(s&&s.type=='human'&&s.uid&&s.ws){s.chal=await chalProgress(s.uid,{won:!!(w&&w.i==f.i),kos:s.kos,online:true,flawless:!!(w&&w.i==f.i)&&f.stocks>=ONLINE_RULES.stocks,players:all.length,mode:r.mode||'stock'})}rank.push({i:f.i,name:s?s.name:'?',skin:f.skin,kos:s?s.kos:0,coins,bd})}
- if(r.quick){const rt=await rateMatch(all.map((f,k)=>{const s=r.slots[f.i];return {uid:s&&s.type=='human'&&s.ws?s.uid:null,guest:s&&s.ws&&s.ws.user.guest,place:w?k:0,won:!!(w&&w.i==f.i)}}));rank.forEach(x=>{const s=r.slots[x.i];if(s&&s.uid&&rt[s.uid])x.rank=rt[s.uid]})}
+ if(!r.tour){const rt=await rateMatch(all.map((f,k)=>{const s=r.slots[f.i];return {uid:s&&s.type=='human'&&s.ws?s.uid:null,guest:s&&s.ws&&s.ws.user.guest,bot:!!(s&&s.type=='cpu'),place:w?k:0,won:!!(w&&w.i==f.i)}}),r.core&&r.core.opts?r.core.opts.diff:0);rank.forEach(x=>{const s=r.slots[x.i];if(s&&s.uid&&rt[s.uid])x.rank=rt[s.uid]})}
  for(const s of viewers(r)){const u=await q.byId(s.uid);if(!u||!s.ws)continue;s.ws.user=u;send(s.ws,{t:'end',tour:!!r.tour,chal:s.chal||[],winner:w?w.i:null,rank,coins:u.coins});send(s.ws,{t:'user',user:pub(u)})}}
 function afterMatch(r){if(r.tour&&r.ent)return tourAfter(r);r.state='lobby';r.core=null;r.slots=r.slots.map(s=>!s||s.type!='human'||!s.ws?(r.quick||!s?null:s.type=='cpu'&&!s.uid?s:null):Object.assign(s,{kos:0,inp:{b:0,e:0},chal:null}));
  if(r.quick)r.fillAt=Date.now()+QUICK_FILL_MS;if(!humans(r).length)return destroy(r);pushLobby(r)}
