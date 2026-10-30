@@ -22,8 +22,12 @@ function lockIcon(x,y,price){ctx.fillStyle='rgba(20,16,28,.6)';ctx.fillRect(x+1,
  if(price!=null){coinIcon(x+3,y+22);text(String(price),x+12,y+29,'#fee761',8)}}
 function acctBadge(x,y,al='left'){if(!ONLINE)return;const s=ACC.user?(ACC.user.username+'  '):'NOT SIGNED IN';const w=s.length*4+(ACC.user?String(ACC.user.coins).length*4+12:0)+8;const x0=al=='right'?x-w:x;panel(x0,y,w,13);text(s,x0+4,y+10,ACC.user?'#ffffff':'#8b93a6',8);if(ACC.user){const cx=x0+4+s.length*4;coinIcon(cx,y+3);text(String(ACC.user.coins),cx+9,y+10,'#fee761',8)}}
 // ===== Main menu =====
-let menuSel=0;const menuItems=()=>ONLINE?['LOCAL BATTLE','TOURNAMENT','ONLINE','CHALLENGES','SHOP','SETTINGS']:['LOCAL BATTLE','TOURNAMENT','SETTINGS'];
-function updMenu(){const it=menuItems();menuSel=listNav(it.length,menuSel);if(mOK()||mStart()){const o=it[menuSel];SFX.ok();if(o=='LOCAL BATTLE')state='select';else if(o=='TOURNAMENT')goLT();else if(o=='SETTINGS')openSettings('menu');else if(o=='ONLINE')goOnline();else if(o=='SHOP')goShop();else if(o=='CHALLENGES')goChal()}}
+let menuSel=0;const menuItems=()=>ONLINE?['LOCAL BATTLE','TOURNAMENT','ONLINE','CHALLENGES','SHOP','SETTINGS','STUDIO SITE']:['LOCAL BATTLE','TOURNAMENT','SETTINGS','STUDIO SITE'];
+const STUDIO_URL='https://contactdeadsilence-blip.github.io/deadsilence-studios/';function openStudio(){try{window.open(STUDIO_URL,'_blank','noopener')}catch(e){}}
+function studioBtn(){const w=128,h=14;return{x:4,y:H-(state=='title'?34:44),w,h}}
+function drawStudio(){const b=studioBtn();panel(b.x,b.y,b.w,b.h,'#2b2b40');text('DEAD SILENCE STUDIOS',b.x+b.w/2,b.y+10,PAL.Y,8,'center')}
+cv.addEventListener('pointerdown',e=>{if(!['title','menu'].includes(state))return;const r=cv.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height,b=studioBtn();if(x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h){e.preventDefault();e.stopPropagation();openStudio()}});
+function updMenu(){const it=menuItems();menuSel=listNav(it.length,menuSel);if(mOK()||mStart()){const o=it[menuSel];SFX.ok();if(o=='LOCAL BATTLE')state='select';else if(o=='TOURNAMENT')goLT();else if(o=='SETTINGS')openSettings('menu');else if(o=='ONLINE')goOnline();else if(o=='SHOP')goShop();else if(o=='CHALLENGES')goChal();else if(o=='STUDIO SITE')openStudio()}}
 function goOnline(){if(ACC.checking){toast('SIGNING IN...');return}if(ACC.user){state='online';onlSel=0}else openLogin('online')}
 function goShop(from){SH.back=from||state;if(ACC.user){state='shop';api('me').then(setUser).catch(()=>{})}else openLogin('shop')}
 function drawMenu(){text('PIXEL DUDES',W/2,58,PAL.Y,48,'center');text('BRAWL',W/2,96,'#ffffff',32,'center');
@@ -215,7 +219,7 @@ function localClaim(){const tk=LC.ticket;LC.ticket=null;if(!tk||!ACC.user)return
  api('local/end',{ticket:tk,players:slots.filter(s=>s.type!='none').length,kos:LKOS[LC.me]||0,won:!!(winner&&winner.i==LC.me),flawless:!!(winner&&winner.i==LC.me&&F[LC.me]&&F[LC.me].stocks>=SET.stocks),mode:typeof MODE!='undefined'?MODE.id:'stock'}).then(j=>{LC.busy=false;LC.res=j;ACC.user=j.user;chalToast(j.chal);if(j.coins)setTimeout(()=>SFX.coin(),400)}).catch(()=>{LC.busy=false})}
 let _prevState=null;const _updC=update;update=function(){_updC();if(state=='win'&&_prevState!='win')localClaim();_prevState=state};
 const _drawC=draw;draw=function(){_drawC();if(!ONLINE)return;ctx.save();ctx.setTransform(cv.width/W,0,0,cv.height/H,0,0);
- if(state=='menu'&&ACC.user)safe(()=>acctBadge(W-4,4,'right'));
+ if(state=='menu'&&ACC.user)safe(()=>acctBadge(W-4,4,'right'));if(state=='menu')drawStudio();
  if(state=='win')safe(()=>{if(!ACC.user)text('LOG IN TO EARN COINS',W/2,184,'#f99252',8,'center');else if(LC.busy)text('COUNTING COINS...',W/2,184,'#d8dde6',8,'center');
   else if(LC.res){const r=LC.res;coinIcon(W/2-60,176);text('+'+r.coins+' COINS   TOTAL '+ACC.user.coins,W/2-50,183,'#fee761',8);text(r.coins?bdText(r.breakdown)+(r.capped?'  (DAILY CAP)':''):(r.why||'DAILY LOCAL CAP REACHED').toUpperCase(),W/2,192,'#d8dde6',8,'center')}});
  if(state=='select'&&!ACC.user)safe(()=>text('LOG IN VIA ONLINE TO EARN COINS + UNLOCK SKINS',W/2,133,'#f99252',8,'center'));

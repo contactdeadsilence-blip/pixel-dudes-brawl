@@ -16,7 +16,7 @@
   "build": {
     "appId": "com.deadsilencestudio.pixeldudesbrawl",
     "productName": "Pixel Dudes Brawl",
-    "files": ["main.js", "offline/**", "build/icon.png"],
+    "files": ["main.js", "offline/**", "build/icon.png", "build/logo-white.svg", "splash.html"],
     "directories": { "buildResources": "build", "output": "dist" },
     "publish": [{ "provider": "github", "owner": "contactdeadsilence-blip", "repo": "pixel-dudes-brawl" }],
     "win": { "target": "nsis", "icon": "build/icon.png" },
