@@ -28,7 +28,7 @@ module.exports=function mount(app,ctx){const {db,PDB,send}=ctx;const W=()=>ctx.w
  A.post('/maintenance',H(async(req,res)=>{ADM.maint=!!(req.body||{}).on;await kvSet('maint',ADM.maint);if(ADM.maint)broadcastAll({t:'notice',m:'MAINTENANCE: NO NEW MATCHES'});res.json({ok:true,maint:ADM.maint})}));
  A.post('/kick',H(async(req,res)=>{const id=+(req.body||{}).id;let n=0;if(!Number.isInteger(id))return res.status(400).json({error:'bad id'});
   for(const ws of W().clients)if(ws.user&&ws.user.id===id){send(ws,{t:'err',m:'KICKED BY ADMIN',fatal:true});ws.close();n++}res.json({ok:true,kicked:n})}));
- A.get('/items',(req,res)=>{const list=PDB.PRICES.map((p,i)=>({key:'skin:'+i,name:'SKIN '+i,base:p})).concat(PDB.COSMETICS.map(c=>({key:'item:'+c.id,name:c.cat+': '+(c.name||c.id),base:c.p})));
+ A.get('/items',(req,res)=>{const list=PDB.PRICES.map((p,i)=>({key:'skin:'+i,name:'SKIN '+i,base:p})).concat(PDB.COSMETICS.map(c=>({key:'item:'+c.id,name:c.cat+': '+(c.n||c.name||c.id),base:c.p})));
   res.json({items:list.map(x=>Object.assign(x,{price:ADM.price(x.key,x.base),off:ADM.off(x.key)}))})});
  A.post('/item',H(async(req,res)=>{const b=req.body||{},key=String(b.key||'');const m=/^skin:(\d+)$/.exec(key),c=/^item:(.+)$/.exec(key);
   if(!(m&&+m[1]<PDB.PRICES.length)&&!(c&&PDB.COS_BY[c[1]]))return res.status(400).json({error:'unknown item'});

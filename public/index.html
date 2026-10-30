@@ -581,7 +581,7 @@ function draw(){camX=0;ctx.setTransform(cv.width/W,0,0,cv.height/H,0,0);ctx.imag
     drawList(O,pauseSel,W/2,100,180,20);if(state=='ofight')text('MATCH KEEPS RUNNING ONLINE',W/2,170,'#d8dde6',8,'center');
     if(lastDev=='pad')prompt([[[PB('DP')],'SELECT'],[[PB('A')],'OK'],[[PB('B')],'BACK']],W/2,184);else prompt([[[KC('\u2191'),KC('\u2193')],'SELECT'],[[KC('ENTER')],'OK'],[[KC('ESC')],'BACK']],W/2,184)}})
    if((state=='fight'||state=='ofight')&&readyT<=0&&!opause){if(lastDev=='pad')prompt([[[PB('ST')],'PAUSE']],W-6,6,'right');else prompt([[[KC('ESC')],'PAUSE']],W-6,6,'right')}}
-toasts.slice(0,1).forEach((o,k)=>{const fs=o.m.length>52?8:o.m.length>26?8:16,w=o.m.length*(fs==8?4:8)+14,h=fs==8?14:18,inF=['fight','ofight','pause','win','oresult'].includes(state),by=inF?H-62:Math.floor((H-270)/2)+(state=='lobby'||state=='select'?218:224),y=by+(o.t<10?(10-o.t)*2:0)+(o.t>94?(o.t-94)*3:0);panel(Math.round(W/2-w/2),y,w,h,'#3b3f52');text(o.m,W/2,y+(fs==8?10:14),'#ffffff',fs,'center')});
+toasts.slice(0,1).forEach((o,k)=>{const fs=o.m.length>52?8:o.m.length>26?8:16,w=o.m.length*(fs==8?4:8)+14,h=fs==8?14:18,inF=['fight','ofight','pause','win','oresult'].includes(state),by=inF?H-62:Math.floor((H-270)/2)+(state=='shop'?198:state=='lobby'||state=='select'?218:224),y=by+(o.t<10?(10-o.t)*2:0)+(o.t>94?(o.t-94)*3:0);panel(Math.round(W/2-w/2),y,w,h,'#3b3f52');text(o.m,W/2,y+(fs==8?10:14),'#ffffff',fs,'center')});
  ctx.restore()}
 function hudName(f){if(state=='ofight'||state=='oresult'){const n=(NET.names[f.i]||'P'+(f.i+1)).slice(0,10);return f.i==NET.you?n:n}return f.cpu?'CPU':'P'+(f.i+1)}
 // ===== Accounts (online build only) =====
@@ -986,7 +986,8 @@ const WPN={
 const WPC={};function wpImg(id){if(!WPC[id]){const h=WPN[id];if(!h)return null;const r=h[0],wd=Math.max(...r.map(x=>x.length)),c=document.createElement('canvas');c.width=wd;c.height=r.length;const x=c.getContext('2d');
  r.forEach((row,y)=>{const off=Math.floor((wd-row.length)/2);[...row].forEach((ch,k)=>{if(ch=='.')return;x.fillStyle=ch=='o'?PAL.o:h[1][ch];x.fillRect(k+off,y,1,1)})});WPC[id]=c}return WPC[id]}
 // angle: 0 = pointing up; idle held forward-up, attack (atkT 20..0) swings from over the shoulder to forward-down
-function wpAng(atkT){if(!(atkT>0))return .55;if(atkT>14)return -1.2+(20-atkT)*.05;if(atkT>=8)return -.9+(14-atkT)*.38;return 1.9-(8-atkT)*.15}
+// grip at hand/waist height; held near-horizontal forward, swing from ~0.9 rad (forward-up) down to ~2.6 rad (knee), settle back
+function wpAng(atkT){if(!(atkT>0))return 1.3;if(atkT>14)return 1.1-(20-atkT)*.03;if(atkT>=8)return .92+(14-atkT)*.28;return 2.6-(8-atkT)*.16}
 function drawWeapon(id,hx,hy,face,ang,sc=1){const im=wpImg(id);if(!im)return;ctx.save();ctx.translate(Math.round(hx),Math.round(hy));ctx.scale(face<0?-sc:sc,sc);ctx.rotate(ang);
  if(id=='wp_beam'){ctx.globalAlpha=.35;ctx.fillStyle='#5fcde4';ctx.fillRect(-im.width/2-1,-im.height,im.width+2,im.height-3);ctx.globalAlpha=1}
  ctx.drawImage(im,-Math.floor(im.width/2),-im.height+2);ctx.restore()}
@@ -996,7 +997,7 @@ function trailPart(id,x,y,list=parts){if(list.length>=PMAX)return;const sp=id=='
  list.push({x:x+(Math.random()-.5)*6,y:y+(Math.random()-.5)*6,vx:(Math.random()-.5)*.6,vy:id=='tr_fire'?-.9:id=='tr_ice'?.1:-.2,l:sp?18:14,c:trailCol(id)})}
 const _drawFc=drawF;drawF=function(f,oy){_drawFc(f,oy);if(f.out||f.respawn>0)return;const eq=fCos(f.i);
  if(eq.trail&&state!='pause'&&(f.dashT>0||Math.abs(f.vx)>1.2||Math.abs(f.vy)>2))safe(()=>trailPart(eq.trail,f.x+5,f.y+12+oy));
- if(eq.weapon&&!(f.inv>0&&Math.floor(t/3)%2))safe(()=>drawWeapon(eq.weapon,f.x+5+f.face*5,f.y+13+oy,f.face,wpAng(f.atkT)));
+ if(eq.weapon&&!(f.inv>0&&Math.floor(t/3)%2))safe(()=>drawWeapon(eq.weapon,f.x+5+f.face*5,f.y+17+oy,f.face,wpAng(f.atkT)));
  if(eq.hat&&!(f.inv>0&&Math.floor(t/3)%2))safe(()=>drawHat(eq.hat,f.x-3,f.y-4+oy,f.face));
  if(eq.name&&state=='ofight'&&NET.names)safe(()=>text(String(NET.names[f.i]||'').slice(0,10),f.x+5,f.y-14+oy,nameCol(eq),8,'center'))};
 function koExtra(id,x,y){if(id=='ko_confetti'){for(let k=0;k<50&&parts.length<PMAX;k++){const a=Math.random()*6.28,v=Math.random()*4+1;parts.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v-2,l:30+Math.random()*20,c:'hsl('+Math.floor(Math.random()*360)+',90%,60%)'})}}
@@ -1066,7 +1067,7 @@ function drawShop(){const tb=SH.tab;text('STORE',W/2,22,PAL.Y,24,'center');acctB
  panel(40,92,400,128);const sk=pvSkin(),fr=Math.floor(t/7)%4;
  if(it.cat=='arena'){PVTH=it.id;try{const bg=bgCanvas(it.th);ctx.drawImage(bg,0,0,W,H,52,98,150,84);const mc=mapCanvas(ARENAS[it.base].map);ctx.drawImage(mc,0,0,mc.width,mc.height,52,98+84-Math.round(150*mc.height/mc.width),150,Math.round(150*mc.height/mc.width))}finally{PVTH=null}}
  else if(it.cat=='pose'){const [px,py,pf]=poseDraw(_drawSheetc,it.id,imgs[sk],84,108,1,2,fr,3);if(myEq().hat)drawHat(myEq().hat,px,py,pf,3);if(it.id=='po_trophy')trophy(px+24,py-14)}
- else{const sv=state;_drawSheetc(imgs[sk],84,108,1,it.cat=='trail'?2:1,it.cat=='trail'?fr:0,3);const h=it.cat=='hat'?it.id:myEq().hat;if(h)drawHat(h,84,108,1,3);const wp=it.cat=='weapon'?it.id:myEq().weapon;if(wp)drawWeapon(wp,84+13*3,108+13*3,1,wpAng(20-Math.floor(t/2)%30),3);
+ else{const sv=state;_drawSheetc(imgs[sk],84,108,1,it.cat=='trail'?2:1,it.cat=='trail'?fr:0,3);const h=it.cat=='hat'?it.id:myEq().hat;if(h)drawHat(h,84,108,1,3);const wp=it.cat=='weapon'?it.id:myEq().weapon;if(wp)drawWeapon(wp,84+13*3,108+17*3,1,wpAng(20-Math.floor(t/2)%30),3);
   if(it.cat=='name'){const nm=ACC.user?(ACC.user.name||ACC.user.username||'PLAYER'):'PLAYER';text(nm.slice(0,12),108,104,nameCol({name:it.id}),16,'center')}}
  for(const p of SH.pv){ctx.fillStyle=p.c;const z=p.l>12?3:2;ctx.fillRect(Math.round(p.x),Math.round(p.y),z,z)}
  text(it.n,220,122,PAL.Y,16);text(TABS[tb].n,220,108,'#d8dde6',8);

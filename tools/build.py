@@ -119,7 +119,7 @@ def post(js):
   X("A JUMP  X ATTACK  B DASH'","A JUMP  X ATK  B DASH  Y SPECIAL'",1)
   # ---- UI tidy (layout only): compact toasts above the footer instead of over screen titles; win-screen prompt below coin lines; select-screen lock note clear of prompts
   X("toasts.slice(0,1).forEach((o,k)=>{const w=o.m.length*8+14,y=4-(o.t<10?(10-o.t)*2:0)-(o.t>94?(o.t-94)*3:0);panel(Math.round(W/2-w/2),y,w,18,'#3b3f52');text(o.m,W/2,y+14,'#ffffff',16,'center')});",
-    "toasts.slice(0,1).forEach((o,k)=>{const fs=o.m.length>52?8:o.m.length>26?8:16,w=o.m.length*(fs==8?4:8)+14,h=fs==8?14:18,inF=['fight','ofight','pause','win','oresult'].includes(state),by=inF?H-62:Math.floor((H-270)/2)+(state=='lobby'||state=='select'?218:224),y=by+(o.t<10?(10-o.t)*2:0)+(o.t>94?(o.t-94)*3:0);panel(Math.round(W/2-w/2),y,w,h,'#3b3f52');text(o.m,W/2,y+(fs==8?10:14),'#ffffff',fs,'center')});",1)
+    "toasts.slice(0,1).forEach((o,k)=>{const fs=o.m.length>52?8:o.m.length>26?8:16,w=o.m.length*(fs==8?4:8)+14,h=fs==8?14:18,inF=['fight','ofight','pause','win','oresult'].includes(state),by=inF?H-62:Math.floor((H-270)/2)+(state=='shop'?198:state=='lobby'||state=='select'?218:224),y=by+(o.t<10?(10-o.t)*2:0)+(o.t>94?(o.t-94)*3:0);panel(Math.round(W/2-w/2),y,w,h,'#3b3f52');text(o.m,W/2,y+(fs==8?10:14),'#ffffff',fs,'center')});",1)
   X("'REMATCH'],[[PB('B')],'MENU']],W/2,196)","'REMATCH'],[[PB('B')],'MENU']],W/2,207)",1)
   X("'REMATCH'],[[KC('ESC')],'MENU']],W/2,196)","'REMATCH'],[[KC('ESC')],'MENU']],W/2,207)",1)
   X("x+72,y+62,'#f99252',8,'center')","x+72,y+58,'#f99252',8,'center')",1)
