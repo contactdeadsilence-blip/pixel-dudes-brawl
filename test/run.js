@@ -73,6 +73,12 @@ const wait=(f,ms,what)=>new Promise((res,rej)=>{const t0=Date.now(),h=setInterva
   while(x=PC.bracketNext(b)){assert.equal(PC.bracketReport(b,x.r,x.m,99),false,'winner must be a player');assert(PC.bracketReport(b,x.r,x.m,Math.max(x.a,x.b)));assert.equal(PC.bracketReport(b,x.r,x.m,x.a),false,'no double report');k++}
   assert.equal(k,n-1,'n-1 matches');assert.equal(PC.bracketChamp(b),n-1,'top winner advanced every round');assert.equal(PC.bracketRound(b,b.rd.length-1),'FINAL')}
  assert.throws(()=>PC.bracketNew(6));console.log('bracket logic OK');
+ {const C=PC.createCore({}),A=C.ARENAS.findIndex(a=>a.name=='SKY CASTLE');assert.ok(A>=4,'sky castle arena');assert.equal(PC.ARENAS_N,C.ARENAS.length);
+  for(const items of [0,2]){C.startFight([0,1,2,3].map(i=>({type:'cpu',skin:i})),A,{stocks:2,diff:2,items});const xs=new Set();let n=0,r,hz=0;
+   while(n<60*60*6&&!(r=C.step(()=>({})))){n++;xs.add(Math.round(C.mp.x/16));if(C.hz.ph==2)hz++}
+   assert.equal(r,'win','bots finish a match on sky castle');assert.ok(xs.size>10,'platform moves');if(items)assert.ok(hz>0,'lightning strikes with items on');else assert.equal(hz,0,'no hazard when items off')}
+  C.startFight([{type:'human',skin:0},{type:'human',skin:1}],A,{items:0});for(let k=0;k<120;k++)C.step(()=>({}));const sx=JSON.parse(JSON.stringify(C.snapX()));const x0=C.mp.x;for(let k=0;k<30;k++)C.step(()=>({}));assert.notEqual(C.mp.x,x0);C.unsnapX(sx);assert.ok(Math.abs(C.mp.x-x0)<.11,'mp snapshot roundtrip');
+  console.log('sky castle OK')}
  // --- 2v2: private room team picking, then 2V2 quick match with bot fill
  r=await api('register',{username:'bob',password:'pw1234'});const Bt=r.j.token;const c3=client(Bt,'bob');await c3.open;
  c1.start=c1.end=null;c1.lobby=null;c1.send({t:'create'});await wait(()=>c1.lobby&&!c1.lobby.quick,2000,'2v2 room');c1.send({t:'rules',mode:'teams'});

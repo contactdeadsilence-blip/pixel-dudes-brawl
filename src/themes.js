@@ -50,7 +50,15 @@ const THEMES=[
    sprP(D16(["..oooo..",".oKKKKo.","oKwKKkko","oKKKKkko","oooooooo"].map(r=>r+"........")),{K:'#c98a5a',k:'#8a5a3a',w:'#f0c090'}),
    sprP(D16([".o..o...","o.oo.o..",".oKKo...","o.oo.o..",".o..o..."].map(r=>r+"........")),{K:'#b08040'})],
   bg:()=>{bands([['#e8603a',0],['#f07a3a',55],['#f59a4a',105],['#f8b85e',150],['#fbd27a',185]]);disc(Math.round(W*.3),Math.round(H*.62),34,'#fff0a0','#ffd060');
-   mesas(.2,64,'#b8603e','#d07a4e',2);mesas(.45,34,'#8a3e2e','#a8523a',6)},thumb:'#f07a3a'}];
+   mesas(.2,64,'#b8603e','#d07a4e',2);mesas(.45,34,'#8a3e2e','#a8523a',6)},thumb:'#f07a3a'},
+ {name:'SKY CASTLE',
+  top:sprP(STONETOP,{G:'#fff2c8',g:'#e8c878',D:'#a8b4d0',d:'#7884a8',e:'#c4cce4'}),fill:sprP(STONE,{D:'#a8b4d0',d:'#7884a8',e:'#c4cce4'}),
+  brick:sprP(BR,{h:'#f4f0ff',R:'#b8b0e0',r:'#7c74b0'}),plank:sprP(PLR,{e:'#f8e0a0',D:'#d0a858',d:'#906830'}),spike:sprP(SPK,{S:'#fff8d8',s:'#d0b060',k:'#5a4a7a'}),
+  decor:THEMES[2].decor,
+  bg:()=>{bands([['#5a7ce8',0],['#6e92f0',45],['#86aaf6',95],['#a4c4fa',145],['#c8dcfc',190]]);disc(W-90,52,20,'#fffbe0','#ffe9a0');
+   const tw=(par,base,col,cap,sp,seed)=>{const cx=Math.floor(camX*par);for(let k=-1;k<W/sp+2;k++){const wx=k+Math.floor(cx/sp),x=wx*sp-cx,h=base+((wx*7919+seed)%5)*10,w=14+((wx*31+seed)%3)*6;ctx.fillStyle=col;ctx.fillRect(x,H-h,w,h);for(let m=0;m<w;m+=4)ctx.fillRect(x+m,H-h-3,2,3);ctx.fillStyle=cap;ctx.fillRect(x+w/2-5,H-h-14,10,11);ctx.fillRect(x+w/2-3,H-h-18,6,4);ctx.fillRect(x+w/2-1,H-h-22,2,4)}};
+   tw(.15,60,'#8c9ee0','#7488d0',64,3);for(let i=0;i<7;i++){const x=Math.floor(((i*170-camX*.25)%1190+1190)%1190-60),y=24+(i*53)%110;ctx.drawImage(SNOWCLOUD,x,y)}
+   tw(.4,34,'#6a78c0','#e08a9a',90,11);ctx.fillStyle='rgba(255,255,255,.5)';for(let i=0;i<5;i++){const x=Math.floor(((i*230-camX*.6)%1150+1150)%1150-80);ctx.fillRect(x,H-24-(i%2)*8,60,6);ctx.fillRect(x+8,H-28-(i%2)*8,40,4)}},thumb:'#6e92f0'}];
 // Store arena themes (cosmetic palette variants of existing arenas; same maps/physics)
 THEMES.push(
  {name:'NIGHT MEADOW',top:sprP(GR,{G:'#3a7a5a',g:'#2c5e48',d:'#4a3a5a',D:'#3a2c48',e:'#54446a'}),fill:sprP(GR.slice(6).concat(GR.slice(6,12)),{D:'#3a2c48',d:'#2c2238',e:'#54446a'}),

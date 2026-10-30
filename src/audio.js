@@ -53,7 +53,10 @@ const SONGS={
   bass:'x.......o...f...',k:'x.........x.....',s:'........x.......',h:'..x...x...x...xx'},
  'GRAND BRIDGE':{bpm:156,root:52,sc:'hij',prog:[0,6,5,6,0,6,5,4],arp:1,
   lead:['7---7-9-a---9-7-','6---4-6-7---6-4-','5---5-7-8---7-5-','6-------9-------','b-a-9-7-a-9-7-6-','9-7-6-4-6---4-6-','5-7-8-a-c-a-8-7-','8---7---6---4---'],
-  bass:'x.xox.xox.xox.xo',k:'x...x...x...x.x.',s:'....x.......x...',h:'xx.xxx.xxx.xxx.x'}};
+  bass:'x.xox.xox.xox.xo',k:'x...x...x...x.x.',s:'....x.......x...',h:'xx.xxx.xxx.xxx.x'},
+ 'SKY CASTLE':{bpm:132,root:64,sc:'maj',prog:[0,5,3,4,0,5,1,4],arp:2,
+  lead:['4-7-b-7-c---b-9-','7---9-7-4---2---','5-9-c-9-e---c-9-','b-------7-------','c-b-9-7-9-b-c-e-','b---9---7---4---','5-7-9-b-c-b-9-7-','9---b---c-------'],
+  bass:'x..ox..ox..ox.o.',k:'x.....x...x.....',s:'....x.......x...',h:'x.x.x.x.x.x.x.xx'}};
 function playSong(name,force){AU.want=name;if(!AU.c||(!force&&AU.songName==name))return;AU.songName=name;AU.song=SONGS[name]||SONGS.menu;AU.step=0;AU.next=AU.c.currentTime+.08}
 function stopSong(){AU.want=null;AU.song=null;AU.songName=null}
 function setDuck(v){if(AU.duck!=v){AU.duck=v;auVol()}}

@@ -220,7 +220,7 @@ function draw(){camX=0;ctx.setTransform(cv.width/W,0,0,cv.height/H,0,0);ctx.imag
   const n=nPlayers();panel(8,238,464,30);
   if(lastDev=='pad'){prompt([[[PB('A')],'JOIN'],[[PB('B')],'LEAVE'],[[PB('Y')],'ADD CPU'],[[PB('X')],'DEL CPU']],W/2,241);prompt([[[PB('LB'),PB('RB')],'PICK'],[[PB('ST')],n>=2?'FIGHT!':'NEED 2+']],W/2,254)}
   else{prompt([[[0,1,2,3].map(i=>kcap(i,'a')),'JOIN'],[[KC('C')],'ADD CPU'],[[KC('BKSP')],'DEL CPU']],W/2,241);prompt([[[KC('ENTER')],n>=2?'FIGHT!':'NEED 2+ PLAYERS']],W/2,254)}}
- else if(state=='arena'){text('CHOOSE ARENA',W/2,34,PAL.Y,32,'center');ARENAS.forEach((a,i)=>{const x=10+i*117,y=74,pw=108,ph=Math.round(108*a.map.length/a.map[0].length);if(i==arena){ctx.fillStyle=PAL.Y;ctx.fillRect(x-3,y-3,pw+6,ph+6)}ctx.fillStyle=PAL.o;ctx.fillRect(x-1,y-1,pw+2,ph+2);ctx.drawImage(arenaPrev[i],x,y,pw,ph);text(a.name,x+pw/2,y+82,i==arena?PAL.Y:'#ffffff',16,'center');text(a.map[0].length+'X'+a.map.length,x+pw/2,y+94,'#d8dde6',8,'center')});
+ else if(state=='arena'){text('CHOOSE ARENA',W/2,34,PAL.Y,32,'center');ARENAS.forEach((a,i)=>{const x=6+i*94,y=74,pw=88,ph=Math.round(88*a.map.length/a.map[0].length);if(i==arena){ctx.fillStyle=PAL.Y;ctx.fillRect(x-3,y-3,pw+6,ph+6)}ctx.fillStyle=PAL.o;ctx.fillRect(x-1,y-1,pw+2,ph+2);ctx.drawImage(arenaPrev[i],x,y,pw,ph);text(a.name,x+pw/2,y+70,i==arena?PAL.Y:'#ffffff',8,'center');text(a.map[0].length+'X'+a.map.length,x+pw/2,y+82,'#d8dde6',8,'center')});
   panel(40,214,400,30);if(lastDev=='pad')prompt([[[PB('DP')],'CHOOSE'],[[PB('A')],'FIGHT'],[[PB('B')],'BACK']],W/2,224);else prompt([[[KC('\u2190'),KC('\u2192')],'CHOOSE'],[[KC('ENTER')],'FIGHT'],[[KC('ESC')],'BACK']],W/2,224)}
  else{drawWorld();
   ctx.restore();ctx.save();drawIndicators();drawHUD();
