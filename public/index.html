@@ -1208,6 +1208,8 @@ UIS.add('ltsetup');UIS.add('ltbracket');UIS.add('ltchamp');
 function goLT(){LT.sel=0;state='ltsetup'}
 function ltBegin(){LT.orig=slots.map(s=>Object.assign({},s));const hs=[];LT.orig.forEach((s,i)=>{if(s.type=='human')hs.push(i)});if(!hs.length)hs.push(0);
  LT.ent=[];for(let k=0;k<Math.min(LT.hum,LT.size);k++){const p=hs[k]!=null?hs[k]:k;LT.ent.push({name:'P'+(p+1),skin:LT.orig[p].skin,human:true,p})}
+ // humans entered straight from the menu never passed the select screen, so their slot has no controller bound and only the keyboard moved them: give each one a connected, unclaimed pad
+ {const taken=LT.orig.map(s=>s.pad).filter(x=>x!=null),free=[];for(let i=0;i<4;i++)if(padsRaw[i]&&!taken.includes(i))free.push(i);LT.ent.forEach(e=>{const o=LT.orig[e.p];if(o.pad==null&&free.length){o.pad=free.shift();o.dev='pad'}})}
  const used=LT.ent.map(e=>e.skin);let c=0;while(LT.ent.length<LT.size){let sk;do{sk=Math.floor(Math.random()*NS)}while(used.includes(sk)&&used.length<NS);used.push(sk);LT.ent.push({name:['BOLT','ZIGGY','MOCHI','RUSTY','PIXIE','TANK','NOVA'][c++%7],skin:sk,human:false})}
  // shuffle seeding
  for(let i=LT.ent.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[LT.ent[i],LT.ent[j]]=[LT.ent[j],LT.ent[i]]}
